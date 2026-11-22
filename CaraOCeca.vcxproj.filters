@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="combat">
+      <UniqueIdentifier>{C1792B8F-B647-4C71-B930-131E464B3018}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game">
+      <UniqueIdentifier>{7C4D816C-BC03-40B1-B740-F16F9986AA9B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="scenes">
+      <UniqueIdentifier>{3315F9BE-C052-4975-9FCA-C49AA61549F9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ui">
+      <UniqueIdentifier>{63E5F0DF-915F-4550-B57E-6B3D35831DE0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="utils">
+      <UniqueIdentifier>{EAFE7DC5-C095-4FA3-933C-7A4AD1F7C6EC}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\combat\clash.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
+    <ClCompile Include="src\combat\coin.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
+    <ClCompile Include="src\combat\enemy_pattern.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
+    <ClCompile Include="src\combat\skill.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
+    <ClCompile Include="src\combat\unit.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
+    <ClCompile Include="src\game\game.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\scenes\gameplay.cpp">
+      <Filter>scenes</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\button.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\combat_log.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\text_utils.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\utils\random.cpp">
+      <Filter>utils</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\combat\clash.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\coin.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\enemy_pattern.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\skill.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\unit.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\game\game.h">
+      <Filter>game</Filter>
+    </ClInclude>
+    <ClInclude Include="src\scenes\gameplay.h">
+      <Filter>scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\button.h">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\combat_log.h">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\text_utils.h">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\utils\random.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
