@@ -128,6 +128,15 @@ namespace ReyesCuadra
         "5. Esquivar no hace daño, pero si gana te salva del golpe. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda el clash."
     };
 
+    // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
+    static sf::Color GetChanceColor(float winChance);
+
+    // Palabra que acompana al porcentaje: "Favorable", "Parejo" o "Desfavorable"
+    static std::string GetChanceVerdict(float winChance);
+
+    // Pasa la chance (0 a 1) a un texto con porcentaje redondeado, por ejemplo "62%"
+    static std::string FormatPercent(float winChance);
+
     // Dibuja el cuadrado de color, el nombre y la barra de vida de una unidad. Si isRightSide es true, se dibuja espejado a la derecha.
     static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide);
 
@@ -254,6 +263,40 @@ namespace ReyesCuadra
 
             winChances[static_cast<size_t>(slotIndex)] = hasClash ? EstimateClashWinChance(*playerSkill, *enemySkill) : -1.0f;
         }
+
+        // Si cambiaron las skills o el slot seleccionado, tambien cambian los numeros de los botones
+        UpdateSkillButtonChances();
+    }
+
+    void Gameplay::UpdateSkillButtonChances()
+    {
+        const Skill* enemySkill = (selectedSlot < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(selectedSlot)] : nullptr;
+
+        for (size_t skillIndex = 0; skillIndex < playerSkills.size(); skillIndex++)
+        {
+            const Skill& playerSkill = playerSkills[skillIndex];
+            Button& button = skillButtons[skillIndex];
+
+            if (playerSkill.IsLocked())
+            {
+                button.SetRightText("", TEXT_COLOR);
+            }
+            else if (enemySkill == nullptr)
+            {
+                // En ese slot Lei Heng no hace nada: no hay clash
+                button.SetRightText("Libre", DIM_TEXT_COLOR);
+            }
+            else if (playerSkill.IsDefensive() && enemySkill->IsDefensive())
+            {
+                button.SetRightText("-", DIM_TEXT_COLOR);
+            }
+            else
+            {
+                const float winChance = EstimateClashWinChance(playerSkill, *enemySkill);
+
+                button.SetRightText(FormatPercent(winChance), GetChanceColor(winChance));
+            }
+        }
     }
 
     void Gameplay::ResolveTurn()
@@ -317,6 +360,7 @@ namespace ReyesCuadra
             if (GetSlotBounds(slotIndex, true).contains(clickPosition))
             {
                 selectedSlot = slotIndex;
+                UpdateSkillButtonChances();
                 return;
             }
         }
@@ -436,23 +480,7 @@ namespace ReyesCuadra
             return;
         }
 
-        sf::Color color = EVEN_COLOR;
-        std::string verdict = "Parejo";
-
-        if (winChance >= FAVORABLE_CHANCE)
-        {
-            color = FAVORABLE_COLOR;
-            verdict = "Favorable";
-        }
-        else if (winChance < UNFAVORABLE_CHANCE)
-        {
-            color = UNFAVORABLE_COLOR;
-            verdict = "Desfavorable";
-        }
-
-        const int percent = static_cast<int>(winChance * PERCENT_MULTIPLIER + 0.5f);
-
-        DrawTextCentered(window, font, std::to_string(percent) + "% · " + verdict, VS_SIZE, area, color);
+        DrawTextCentered(window, font, FormatPercent(winChance) + " · " + GetChanceVerdict(winChance), VS_SIZE, area, GetChanceColor(winChance));
     }
 
     void Gameplay::DrawSkillButtons(sf::RenderWindow& window) const
@@ -519,6 +547,44 @@ namespace ReyesCuadra
         }
 
         closeHelpButton.Draw(window, mousePosition);
+    }
+
+    static sf::Color GetChanceColor(float winChance)
+    {
+        if (winChance >= FAVORABLE_CHANCE)
+        {
+            return FAVORABLE_COLOR;
+        }
+
+        if (winChance < UNFAVORABLE_CHANCE)
+        {
+            return UNFAVORABLE_COLOR;
+        }
+
+        return EVEN_COLOR;
+    }
+
+    static std::string GetChanceVerdict(float winChance)
+    {
+        if (winChance >= FAVORABLE_CHANCE)
+        {
+            return "Favorable";
+        }
+
+        if (winChance < UNFAVORABLE_CHANCE)
+        {
+            return "Desfavorable";
+        }
+
+        return "Parejo";
+    }
+
+    static std::string FormatPercent(float winChance)
+    {
+        // Se suma 0.5 antes de pasar a entero para redondear en vez de cortar
+        const int percent = static_cast<int>(winChance * PERCENT_MULTIPLIER + 0.5f);
+
+        return std::to_string(percent) + "%";
     }
 
     static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide)

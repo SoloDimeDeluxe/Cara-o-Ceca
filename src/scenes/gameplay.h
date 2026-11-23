@@ -51,6 +51,10 @@ namespace ReyesCuadra
         // Recalcula el porcentaje de victoria de cada columna (se llama cada vez que cambia alguna skill)
         void UpdateWinChances();
 
+        // Pone al lado de cada boton de skill la chance que tendria esa skill contra la de Lei Heng del slot seleccionado,
+        // asi el jugador compara antes de elegir (como en Limbus)
+        void UpdateSkillButtonChances();
+
         // Hace los clashes de todas las columnas y despues se fija si alguien murio
         void ResolveTurn();
 

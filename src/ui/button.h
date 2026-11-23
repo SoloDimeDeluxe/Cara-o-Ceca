@@ -20,6 +20,10 @@ namespace ReyesCuadra
         bool IsEnabled() const;
         void SetEnabled(bool enabled);
 
+        // Texto corto que se muestra pegado al borde derecho del boton (por ejemplo, la chance de ganar el clash).
+        // Con un texto vacio no se muestra nada.
+        void SetRightText(const std::string& text, sf::Color color);
+
         // Dibuja el boton, resaltado si el mouse esta encima
         void Draw(sf::RenderWindow& window, sf::Vector2f mousePosition) const;
 
@@ -28,6 +32,8 @@ namespace ReyesCuadra
         sf::FloatRect bounds;
         std::string label;
         std::string subLabel;
+        std::string rightText;
+        sf::Color rightTextColor;
         bool isEnabled;
     };
 }

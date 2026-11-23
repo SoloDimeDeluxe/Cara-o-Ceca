@@ -7,6 +7,7 @@ namespace ReyesCuadra
     // Tamanos de los textos del boton
     static const unsigned int LABEL_SIZE = 17;
     static const unsigned int SUB_LABEL_SIZE = 14;
+    static const unsigned int RIGHT_TEXT_SIZE = 20;
     static const float TEXT_PADDING_X = 12.0f;
     static const float LABEL_OFFSET_Y = 2.0f;
     static const float SUB_LABEL_OFFSET_Y = 22.0f;
@@ -26,6 +27,8 @@ namespace ReyesCuadra
         , bounds(buttonBounds)
         , label(buttonLabel)
         , subLabel(buttonSubLabel)
+        , rightText("")
+        , rightTextColor(LABEL_COLOR)
         , isEnabled(true)
     {
     }
@@ -43,6 +46,12 @@ namespace ReyesCuadra
     void Button::SetEnabled(bool enabled)
     {
         isEnabled = enabled;
+    }
+
+    void Button::SetRightText(const std::string& text, sf::Color color)
+    {
+        rightText = text;
+        rightTextColor = color;
     }
 
     void Button::Draw(sf::RenderWindow& window, sf::Vector2f mousePosition) const
@@ -77,6 +86,17 @@ namespace ReyesCuadra
         {
             DrawTextAt(window, font, label, LABEL_SIZE, { bounds.position.x + TEXT_PADDING_X, bounds.position.y + LABEL_OFFSET_Y }, labelColor);
             DrawTextAt(window, font, subLabel, SUB_LABEL_SIZE, { bounds.position.x + TEXT_PADDING_X, bounds.position.y + SUB_LABEL_OFFSET_Y }, subLabelColor);
+        }
+
+        // El texto de la derecha va centrado en altura, pegado al borde derecho
+        if (isEnabled && !rightText.empty())
+        {
+            const sf::FloatRect rightArea({ bounds.position.x + bounds.size.x - TEXT_PADDING_X, bounds.position.y }, { 0.0f, bounds.size.y });
+            sf::Text measure(font, ToSfString(rightText), RIGHT_TEXT_SIZE);
+            const float textWidth = measure.getLocalBounds().size.x;
+            const sf::FloatRect textArea({ rightArea.position.x - textWidth, bounds.position.y }, { textWidth, bounds.size.y });
+
+            DrawTextCentered(window, font, rightText, RIGHT_TEXT_SIZE, textArea, rightTextColor);
         }
     }
 }
