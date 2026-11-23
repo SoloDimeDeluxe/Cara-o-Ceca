@@ -47,40 +47,38 @@ namespace ReyesCuadra
         int onHitWithoutCrackingCount = 0;
     };
 
-    // Tremor que pone una moneda al golpear (las skills de Lei Heng cambian moneda por moneda)
-    struct CoinTremorEffect
+    // Lo que pone una moneda en el objetivo al golpear (las skills de Lei Heng cambian moneda por moneda)
+    struct CoinStatusEffect
     {
-        // [Al golpear]: Tremor que le pone al objetivo
-        int potency = 0;
-        int count = 0;
+        // [Al golpear]: Tremor y Burn que le pone al objetivo
+        int tremorPotency = 0;
+        int tremorCount = 0;
+        int burnPotency = 0;
+        int burnCount = 0;
 
-        // Extra que solo se pone si el golpe viene de un clash
-        int clashOnlyPotency = 0;
-        int clashOnlyCount = 0;
+        // [Al golpear sin Cracking]: Tremor extra. Como todavia no existe el Cracking, por ahora se pone siempre.
+        int tremorWithoutCrackingPotency = 0;
+        int tremorWithoutCrackingCount = 0;
 
-        // [Al golpear]: cuantas veces le hace Tremor Burst al objetivo (0 = ninguna)
+        // [Al golpear]: cuantas veces le hace Tremor Burst al objetivo (0 = ninguna), si hace falta que sea sin Cracking,
+        // y cuanta cantidad de Tremor le saca despues de los Burst
         int burstTimes = 0;
-
-        // Condiciones para el Burst: que el golpe venga de un clash y/o que el golpe no haga "Cracking"
-        bool burstOnlyInClash = false;
         bool burstOnlyWithoutCracking = false;
-
-        // Cantidad de Tremor que le saca al objetivo despues de los Burst
         int countLossAfterBurst = 0;
     };
 
-    // Efectos de Tremor de una skill
-    struct TremorEffects
+    // Efectos de una skill sobre los estados del objetivo (Tremor y Burn)
+    struct TargetStatusEffects
     {
         // Un efecto por moneda, en el mismo orden que las monedas (puede tener menos elementos que monedas)
-        std::vector<CoinTremorEffect> perCoin;
+        std::vector<CoinStatusEffect> perCoin;
 
-        // Poder base +1 cada "tremorPerBasePower" de Tremor del objetivo, hasta maxBasePowerBonus (0 = no tiene este bonus)
-        int tremorPerBasePower = 0;
-        int maxBasePowerBonus = 0;
+        // Poder final +1 cada "statusPerFinalPower" de (Burn + Tremor) del objetivo, hasta maxFinalPowerBonus (0 = no tiene)
+        int statusPerFinalPower = 0;
+        int maxFinalPowerBonus = 0;
 
-        // Poder de moneda +1 cada "tremorPerCoinPower" de Tremor del objetivo, hasta maxCoinPowerBonus (0 = no tiene este bonus)
-        int tremorPerCoinPower = 0;
+        // Poder de moneda +1 cada "statusPerCoinPower" de (Burn + Tremor) del objetivo, hasta maxCoinPowerBonus (0 = no tiene)
+        int statusPerCoinPower = 0;
         int maxCoinPowerBonus = 0;
     };
 
@@ -118,9 +116,9 @@ namespace ReyesCuadra
         const SinkingEffects& GetSinkingEffects() const;
         void SetSinkingEffects(const SinkingEffects& effects);
 
-        // Efectos de Tremor de la skill
-        const TremorEffects& GetTremorEffects() const;
-        void SetTremorEffects(const TremorEffects& effects);
+        // Efectos de la skill sobre el Tremor y el Burn del objetivo
+        const TargetStatusEffects& GetTargetStatusEffects() const;
+        void SetTargetStatusEffects(const TargetStatusEffects& effects);
 
         // Lineas de texto que explican los efectos de la skill (Poise, Sinking, bonus de poder), para el cartel de ayuda
         std::vector<std::string> GetEffectLines() const;
@@ -137,7 +135,7 @@ namespace ReyesCuadra
         std::vector<Coin> coins;
         PoiseEffects poiseEffects;
         SinkingEffects sinkingEffects;
-        TremorEffects tremorEffects;
+        TargetStatusEffects targetStatusEffects;
         bool isLocked;
     };
 }

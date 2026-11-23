@@ -81,8 +81,8 @@ namespace ReyesCuadra
     static const sf::Vector2f HELP_BOX_SIZE = { 940.0f, 700.0f };
     static const float HELP_PADDING = 30.0f;
     static const float HELP_TITLE_HEIGHT = 50.0f;
-    static const float HELP_LINE_HEIGHT = 23.0f;
-    static const float HELP_RULE_GAP = 8.0f;
+    static const float HELP_LINE_HEIGHT = 22.0f;
+    static const float HELP_RULE_GAP = 6.0f;
     static const sf::Vector2f CLOSE_HELP_BUTTON_SIZE = { 220.0f, 48.0f };
     static const sf::FloatRect HELP_BUTTON_BOUNDS = sf::FloatRect({ 1100.0f, 330.0f }, { 150.0f, 28.0f });
 
@@ -91,6 +91,10 @@ namespace ReyesCuadra
     static const float TOOLTIP_TITLE_LINE_HEIGHT = 26.0f;
     static const float TOOLTIP_LINE_HEIGHT = 23.0f;
     static const float TOOLTIP_SECTION_GAP = 8.0f;
+
+    // Despues de cerrar un cartel (ayuda o fin de partida) se ignoran los clics un ratito,
+    // asi un doble clic no "atraviesa" el cartel y aprieta lo que hay abajo (por ejemplo, Combatir)
+    static const float CLICK_COOLDOWN_SECONDS = 0.35f;
 
     // A partir de que porcentaje un clash se considera favorable o desfavorable
     static const float FAVORABLE_CHANCE = 0.6f;
@@ -109,7 +113,7 @@ namespace ReyesCuadra
     static const unsigned int HINT_SIZE = 15;
     static const unsigned int GAME_OVER_TITLE_SIZE = 48;
     static const unsigned int HELP_TITLE_SIZE = 34;
-    static const unsigned int HELP_RULE_SIZE = 18;
+    static const unsigned int HELP_RULE_SIZE = 17;
     static const unsigned int TOOLTIP_TITLE_SIZE = 21;
     static const unsigned int TOOLTIP_TEXT_SIZE = 17;
 
@@ -149,7 +153,8 @@ namespace ReyesCuadra
         "7. Sinking: las skills de Yi Sang se lo ponen a Lei Heng. Cada vez que lo golpean pierde cordura igual a la potencia (si ya está en -45, pierde vida) y la cantidad baja 1.",
         "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos (también las de Lei Heng).",
         "9. Stagger: las marcas en las barras de vida son umbrales. Si la vida baja de uno, esa unidad queda staggereada: pierde lo que le quedaba del turno, no actúa el turno siguiente y mientras tanto recibe el doble de daño.",
-        "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang y la cantidad baja 1 al final de cada turno. El Triple Corte hace Tremor Burst: tu próximo umbral de Stagger sube tantos puntos como la potencia de Tremor, así te staggerea antes."
+        "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang y la cantidad baja 1 al final de cada turno. Varias skills hacen Tremor Burst: tu próximo umbral de Stagger sube tantos puntos como la potencia de Tremor, así te staggerea antes.",
+        "11. Burn: Lei Heng también te quema. Al final de cada turno recibís daño fijo igual a la potencia y la cantidad baja 1. Sus skills pegan más fuerte cuanto más Burn + Tremor tengas. Abajo de las barras, los estados se muestran como potencia·cantidad."
     };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
@@ -266,39 +271,76 @@ namespace ReyesCuadra
             skillButtons.back().SetEnabled(!skill.IsLocked());
         }
 
-        // Tremor que inflige cada skill de Lei Heng, moneda por moneda (sacado de los datos del juego).
-        // Por ahora solo el Tremor comun y el Tremor Burst del Triple Corte: sin variantes y sin bonus de poder por Tremor.
-        // Doble Corte y Triple Corte son sus versiones "Explosion"
-        TremorEffects doubleSlashTremor;
-        doubleSlashTremor.perCoin.resize(2);
-        doubleSlashTremor.perCoin[0].potency = 3;
-        doubleSlashTremor.perCoin[1].potency = 3;
-        doubleSlashTremor.perCoin[1].count = 2;
-        doubleSlash.SetTremorEffects(doubleSlashTremor);
+        // Tremor y Burn que inflige cada skill de Lei Heng, moneda por moneda (sacado de los datos del juego).
+        // Lo de "sin Cracking" se aplica siempre porque todavia no existe el Cracking.
+        // Sin "Tremor - Ignition" (no sabemos que hace todavia) y sin Rondas de Marca de Tigre.
 
-        TremorEffects tripleSlashTremor;
-        tripleSlashTremor.perCoin.resize(3);
-        tripleSlashTremor.perCoin[0].count = 2;
-        tripleSlashTremor.perCoin[1].potency = 2;
-        tripleSlashTremor.perCoin[1].count = 2;
-        tripleSlashTremor.perCoin[2].burstTimes = 2;
-        tripleSlashTremor.perCoin[2].burstOnlyWithoutCracking = true;
-        tripleSlashTremor.perCoin[2].countLossAfterBurst = 2;
-        tripleSlash.SetTremorEffects(tripleSlashTremor);
+        // Doble Corte - Explosion: poder final +1 cada 4 de (Burn + Tremor) del objetivo, maximo +4
+        TargetStatusEffects doubleSlashEffects;
+        doubleSlashEffects.statusPerFinalPower = 4;
+        doubleSlashEffects.maxFinalPowerBonus = 4;
+        doubleSlashEffects.perCoin.resize(2);
+        doubleSlashEffects.perCoin[0].tremorPotency = 3;
+        doubleSlashEffects.perCoin[1].burnPotency = 3;
+        doubleSlashEffects.perCoin[1].burnCount = 2;
+        doubleSlashEffects.perCoin[1].tremorPotency = 3;
+        doubleSlashEffects.perCoin[1].tremorCount = 2;
+        doubleSlash.SetTargetStatusEffects(doubleSlashEffects);
 
-        TremorEffects explosiveSlashTremor;
-        explosiveSlashTremor.perCoin.resize(2);
-        explosiveSlashTremor.perCoin[0].potency = 3;
-        explosiveSlashTremor.perCoin[0].clashOnlyPotency = 4;
-        explosiveSlashTremor.perCoin[0].clashOnlyCount = 4;
-        explosiveSlashTremor.perCoin[1].count = 3;
-        explosiveSlash.SetTremorEffects(explosiveSlashTremor);
+        // Triple Corte - Explosion: igual bonus; la 3ra moneda hace Tremor Burst 2 veces y saca 2 de cantidad
+        TargetStatusEffects tripleSlashEffects;
+        tripleSlashEffects.statusPerFinalPower = 4;
+        tripleSlashEffects.maxFinalPowerBonus = 4;
+        tripleSlashEffects.perCoin.resize(3);
+        tripleSlashEffects.perCoin[0].tremorCount = 2;
+        tripleSlashEffects.perCoin[1].burnPotency = 3;
+        tripleSlashEffects.perCoin[1].burnCount = 2;
+        tripleSlashEffects.perCoin[1].tremorPotency = 2;
+        tripleSlashEffects.perCoin[1].tremorCount = 2;
+        tripleSlashEffects.perCoin[2].burnPotency = 3;
+        tripleSlashEffects.perCoin[2].burnCount = 2;
+        tripleSlashEffects.perCoin[2].burstTimes = 2;
+        tripleSlashEffects.perCoin[2].burstOnlyWithoutCracking = true;
+        tripleSlashEffects.perCoin[2].countLossAfterBurst = 2;
+        tripleSlash.SetTargetStatusEffects(tripleSlashEffects);
 
-        TremorEffects tigerslayerTremor;
-        tigerslayerTremor.perCoin.resize(4);
-        tigerslayerTremor.perCoin[2].potency = 6;
-        tigerslayerTremor.perCoin[3].count = 6;
-        tigerslayerFlurry.SetTremorEffects(tigerslayerTremor);
+        // Tajo Destrozador Explosivo: poder de moneda +1 cada 6 de (Burn + Tremor) del objetivo, maximo +3
+        TargetStatusEffects explosiveSlashEffects;
+        explosiveSlashEffects.statusPerCoinPower = 6;
+        explosiveSlashEffects.maxCoinPowerBonus = 3;
+        explosiveSlashEffects.perCoin.resize(3);
+        explosiveSlashEffects.perCoin[0].burnPotency = 3;
+        explosiveSlashEffects.perCoin[0].tremorPotency = 3;
+        explosiveSlashEffects.perCoin[0].tremorWithoutCrackingPotency = 4;
+        explosiveSlashEffects.perCoin[0].tremorWithoutCrackingCount = 4;
+        explosiveSlashEffects.perCoin[1].burnCount = 3;
+        explosiveSlashEffects.perCoin[1].tremorCount = 3;
+        explosiveSlashEffects.perCoin[2].burnPotency = 3;
+        explosiveSlashEffects.perCoin[2].burnCount = 3;
+        explosiveSlashEffects.perCoin[2].burstTimes = 1;
+        explosiveSlashEffects.perCoin[2].burstOnlyWithoutCracking = true;
+        explosiveSlashEffects.perCoin[2].countLossAfterBurst = 1;
+        explosiveSlash.SetTargetStatusEffects(explosiveSlashEffects);
+
+        // Cortador de enredos: su unica moneda hace Tremor Burst
+        TargetStatusEffects tangleCutterEffects;
+        tangleCutterEffects.perCoin.resize(1);
+        tangleCutterEffects.perCoin[0].burstTimes = 1;
+        tangleCutterEffects.perCoin[0].burstOnlyWithoutCracking = true;
+        tangleCutterEffects.perCoin[0].countLossAfterBurst = 1;
+        tangleCutter.SetTargetStatusEffects(tangleCutterEffects);
+
+        // Rafaga de espadas perfeccionada marca Savage Tigerslayer
+        TargetStatusEffects tigerslayerEffects;
+        tigerslayerEffects.perCoin.resize(6);
+        tigerslayerEffects.perCoin[0].burnPotency = 6;
+        tigerslayerEffects.perCoin[1].burnCount = 6;
+        tigerslayerEffects.perCoin[2].tremorPotency = 6;
+        tigerslayerEffects.perCoin[3].tremorCount = 6;
+        tigerslayerEffects.perCoin[5].burstTimes = 1;
+        tigerslayerEffects.perCoin[5].burstOnlyWithoutCracking = true;
+        tigerslayerEffects.perCoin[5].countLossAfterBurst = 1;
+        tigerslayerFlurry.SetTargetStatusEffects(tigerslayerEffects);
 
         StartNewGame();
     }
@@ -460,7 +502,11 @@ namespace ReyesCuadra
             }
         }
 
-        // Al final del turno, la cantidad de Poise y de Tremor baja 1 y los staggereados avanzan su recuperacion
+        // Al final del turno quema el Burn (dano fijo); despues la cantidad de Poise y de Tremor baja 1
+        // y los staggereados avanzan su recuperacion
+        ApplyBurnAtTurnEnd(player);
+        ApplyBurnAtTurnEnd(enemy);
+
         player.GetPoise().OnTurnEnd();
         enemy.GetPoise().OnTurnEnd();
         player.GetTremor().OnTurnEnd();
@@ -493,12 +539,43 @@ namespace ReyesCuadra
         }
     }
 
+    void Gameplay::ApplyBurnAtTurnEnd(Unit& unit)
+    {
+        if (unit.IsDead())
+        {
+            return;
+        }
+
+        const int burnDamage = unit.GetBurn().OnTurnEnd();
+
+        if (burnDamage <= 0)
+        {
+            return;
+        }
+
+        unit.TakeDamage(burnDamage);
+        combatLog.AddLine(unit.GetName() + " se quema: " + std::to_string(burnDamage) + " de daño por Burn.");
+
+        // La quemada tambien puede romper un umbral de Stagger
+        if (unit.ConsumeStaggerEvent())
+        {
+            combatLog.AddLine("¡" + unit.GetName() + " queda staggereado por la quemadura! No actúa el próximo turno.");
+        }
+    }
+
     void Gameplay::HandleClick(sf::Vector2f clickPosition)
     {
-        // Con la ayuda abierta, cualquier clic la cierra
+        // Con la ayuda abierta, cualquier clic la cierra (y arranca la espera para el proximo clic)
         if (isShowingHelp)
         {
             isShowingHelp = false;
+            clickCooldownClock.restart();
+            return;
+        }
+
+        // Si se acaba de cerrar un cartel, este clic es el segundo de un doble clic: se ignora
+        if (clickCooldownClock.getElapsedTime() < sf::seconds(CLICK_COOLDOWN_SECONDS))
+        {
             return;
         }
 
@@ -508,6 +585,7 @@ namespace ReyesCuadra
             if (restartButton.Contains(clickPosition))
             {
                 StartNewGame();
+                clickCooldownClock.restart();
             }
 
             return;
@@ -898,23 +976,30 @@ namespace ReyesCuadra
         const Poise& poise = unit.GetPoise();
         const Sinking& sinking = unit.GetSinking();
         const std::string sanitySign = (unit.GetSanity() > 0) ? "+" : "";
-        std::string statusText = unit.IsStaggered() ? "STAGGER     SP " + sanitySign : "SP " + sanitySign + std::to_string(unit.GetSanity()) + " (" + FormatPercent(unit.GetHeadsChance()) + " cara)";
+        std::string statusText = unit.IsStaggered() ? "STAGGER   SP " + sanitySign : "SP " + sanitySign + std::to_string(unit.GetSanity()) + " (" + FormatPercent(unit.GetHeadsChance()) + " cara)";
 
         if (poise.IsActive())
         {
-            statusText += "     Poise " + std::to_string(poise.GetPotency()) + " pot. · " + std::to_string(poise.GetCount()) + " cant. (" + FormatPercent(poise.GetCriticalChance()) + " crítico)";
+            statusText += "   Poise " + std::to_string(poise.GetPotency()) + "·" + std::to_string(poise.GetCount()) + " (" + FormatPercent(poise.GetCriticalChance()) + " crít.)";
         }
 
         if (sinking.IsActive())
         {
-            statusText += "     Sinking " + std::to_string(sinking.GetPotency()) + " pot. · " + std::to_string(sinking.GetCount()) + " cant.";
+            statusText += "   Sinking " + std::to_string(sinking.GetPotency()) + "·" + std::to_string(sinking.GetCount());
+        }
+
+        const Burn& burn = unit.GetBurn();
+
+        if (burn.IsActive())
+        {
+            statusText += "   Burn " + std::to_string(burn.GetPotency()) + "·" + std::to_string(burn.GetCount());
         }
 
         const Tremor& tremor = unit.GetTremor();
 
         if (tremor.IsActive())
         {
-            statusText += "     Tremor " + std::to_string(tremor.GetPotency()) + " pot. · " + std::to_string(tremor.GetCount()) + " cant.";
+            statusText += "   Tremor " + std::to_string(tremor.GetPotency()) + "·" + std::to_string(tremor.GetCount());
         }
 
         const float statusY = barY + HP_BAR_HEIGHT + POISE_TEXT_OFFSET_Y;

@@ -59,6 +59,9 @@ namespace ReyesCuadra
         // Hace los clashes de todas las columnas y despues se fija si alguien murio
         void ResolveTurn();
 
+        // Al final del turno, la unidad recibe el dano de su Burn (y se avisa en el registro)
+        void ApplyBurnAtTurnEnd(Unit& unit);
+
         // Reacciona a un clic izquierdo segun lo que haya debajo del mouse
         void HandleClick(sf::Vector2f clickPosition);
 
@@ -119,6 +122,9 @@ namespace ReyesCuadra
 
         GameState state;
         bool isShowingHelp;
+
+        // Cuenta el tiempo desde que se cerro el ultimo cartel, para ignorar el segundo clic de un doble clic
+        sf::Clock clickCooldownClock;
         int turn;
         int selectedSlot;
         sf::Vector2f mousePosition;

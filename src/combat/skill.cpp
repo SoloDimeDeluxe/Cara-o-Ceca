@@ -98,14 +98,14 @@ namespace ReyesCuadra
         sinkingEffects = effects;
     }
 
-    const TremorEffects& Skill::GetTremorEffects() const
+    const TargetStatusEffects& Skill::GetTargetStatusEffects() const
     {
-        return tremorEffects;
+        return targetStatusEffects;
     }
 
-    void Skill::SetTremorEffects(const TremorEffects& effects)
+    void Skill::SetTargetStatusEffects(const TargetStatusEffects& effects)
     {
-        tremorEffects = effects;
+        targetStatusEffects = effects;
     }
 
     std::vector<std::string> Skill::GetEffectLines() const
@@ -144,47 +144,43 @@ namespace ReyesCuadra
             lines.push_back("Poder de moneda +1 cada 6 de (Poise propio + Sinking del objetivo), máximo +2");
         }
 
-        // Tremor (sobre el objetivo), moneda por moneda
-        if (tremorEffects.tremorPerBasePower > 0)
+        // Tremor y Burn (sobre el objetivo), moneda por moneda
+        const TargetStatusEffects& statusEffects = targetStatusEffects;
+
+        if (statusEffects.statusPerFinalPower > 0)
         {
-            lines.push_back("Poder base +1 cada " + std::to_string(tremorEffects.tremorPerBasePower) + " de Tremor del objetivo, máximo +" + std::to_string(tremorEffects.maxBasePowerBonus));
+            lines.push_back("Poder final +1 cada " + std::to_string(statusEffects.statusPerFinalPower) + " de (Burn + Tremor) del objetivo, máximo +" + std::to_string(statusEffects.maxFinalPowerBonus));
         }
 
-        if (tremorEffects.tremorPerCoinPower > 0)
+        if (statusEffects.statusPerCoinPower > 0)
         {
-            lines.push_back("Poder de moneda +1 cada " + std::to_string(tremorEffects.tremorPerCoinPower) + " de Tremor del objetivo, máximo +" + std::to_string(tremorEffects.maxCoinPowerBonus));
+            lines.push_back("Poder de moneda +1 cada " + std::to_string(statusEffects.statusPerCoinPower) + " de (Burn + Tremor) del objetivo, máximo +" + std::to_string(statusEffects.maxCoinPowerBonus));
         }
 
-        for (size_t coinIndex = 0; coinIndex < tremorEffects.perCoin.size(); coinIndex++)
+        for (size_t coinIndex = 0; coinIndex < statusEffects.perCoin.size(); coinIndex++)
         {
-            const CoinTremorEffect& coinEffect = tremorEffects.perCoin[coinIndex];
+            const CoinStatusEffect& coinEffect = statusEffects.perCoin[coinIndex];
             const std::string coinPrefix = "Moneda " + std::to_string(coinIndex + 1) + ": ";
 
-            if (coinEffect.potency > 0 || coinEffect.count > 0)
+            if (coinEffect.burnPotency > 0 || coinEffect.burnCount > 0)
             {
-                lines.push_back(coinPrefix + "[Al golpear] Inflige " + DescribeStatusAmount(coinEffect.potency, coinEffect.count) + " de Tremor");
+                lines.push_back(coinPrefix + "[Al golpear] Inflige " + DescribeStatusAmount(coinEffect.burnPotency, coinEffect.burnCount) + " de Burn");
             }
 
-            if (coinEffect.clashOnlyPotency > 0 || coinEffect.clashOnlyCount > 0)
+            if (coinEffect.tremorPotency > 0 || coinEffect.tremorCount > 0)
             {
-                lines.push_back(coinPrefix + "[Al golpear en un clash] Inflige " + DescribeStatusAmount(coinEffect.clashOnlyPotency, coinEffect.clashOnlyCount) + " de Tremor");
+                lines.push_back(coinPrefix + "[Al golpear] Inflige " + DescribeStatusAmount(coinEffect.tremorPotency, coinEffect.tremorCount) + " de Tremor");
+            }
+
+            if (coinEffect.tremorWithoutCrackingPotency > 0 || coinEffect.tremorWithoutCrackingCount > 0)
+            {
+                lines.push_back(coinPrefix + "[Al golpear sin Cracking] Inflige " + DescribeStatusAmount(coinEffect.tremorWithoutCrackingPotency, coinEffect.tremorWithoutCrackingCount) + " de Tremor");
             }
 
             if (coinEffect.burstTimes > 0)
             {
-                std::string condition = "[Al golpear";
-
-                if (coinEffect.burstOnlyInClash)
-                {
-                    condition += " en un clash";
-                }
-
-                if (coinEffect.burstOnlyWithoutCracking)
-                {
-                    condition += " sin Cracking";
-                }
-
-                std::string line = coinPrefix + condition + "] Tremor Burst";
+                const std::string condition = coinEffect.burstOnlyWithoutCracking ? "[Al golpear sin Cracking]" : "[Al golpear]";
+                std::string line = coinPrefix + condition + " Tremor Burst";
 
                 if (coinEffect.burstTimes > 1)
                 {

@@ -8,6 +8,7 @@
 
 #include "combat/poise.h"
 #include "combat/sinking.h"
+#include "combat/burn.h"
 #include "combat/tremor.h"
 
 namespace ReyesCuadra
@@ -79,6 +80,10 @@ namespace ReyesCuadra
         // Devuelve cuantos puntos subio el umbral (0 si no tenia Tremor o ya no le quedaban umbrales).
         int TriggerTremorBurst();
 
+        // Estado de Burn de la unidad (dano fijo al final de cada turno)
+        Burn& GetBurn();
+        const Burn& GetBurn() const;
+
         // Deja la unidad como al principio: vida llena y sin estados (para empezar una partida nueva)
         void Reset();
 
@@ -95,6 +100,7 @@ namespace ReyesCuadra
         Poise poise;
         Sinking sinking;
         Tremor tremor;
+        Burn burn;
 
         // Umbrales originales (sin los cambios del Tremor), para volver a ponerlos al empezar otra partida
         std::vector<float> originalStaggerThresholds;

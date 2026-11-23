@@ -188,6 +188,16 @@ namespace ReyesCuadra
         return BASE_HEADS_CHANCE + static_cast<float>(sanity) * HEADS_CHANCE_PER_SANITY;
     }
 
+    Burn& Unit::GetBurn()
+    {
+        return burn;
+    }
+
+    const Burn& Unit::GetBurn() const
+    {
+        return burn;
+    }
+
     Tremor& Unit::GetTremor()
     {
         return tremor;
@@ -245,6 +255,7 @@ namespace ReyesCuadra
         poise.Clear();
         sinking.Clear();
         tremor.Clear();
+        burn.Clear();
         staggerThresholds = originalStaggerThresholds;
     }
 }
