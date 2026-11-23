@@ -14,6 +14,9 @@ namespace ReyesCuadra
         // Se llama al final del turno: devuelve el dano que tiene que recibir la unidad (0 si no tiene Burn)
         // y despues baja 1 la cantidad.
         int OnTurnEnd();
+
+        // Saca 1 de cantidad (lo usa el Tremor - Scorch en cada Burst)
+        void LoseOneCount();
     };
 }
 

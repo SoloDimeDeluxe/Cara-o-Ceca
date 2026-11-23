@@ -25,8 +25,8 @@ namespace ReyesCuadra
         // Suma cantidad. Si no tenia el estado, arranca con 1 de potencia (como en Limbus).
         void AddCount(int amount);
 
-        // Saca todo el estado (para empezar una partida nueva)
-        void Clear();
+        // Saca todo el estado (para empezar una partida nueva). Es virtual porque Tremor ademas apaga el Scorch.
+        virtual void Clear();
 
     protected:
         // Baja la cantidad en 1 y, si llega a 0, borra el estado

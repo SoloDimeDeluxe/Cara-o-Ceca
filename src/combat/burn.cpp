@@ -15,4 +15,9 @@ namespace ReyesCuadra
 
         return damage;
     }
+
+    void Burn::LoseOneCount()
+    {
+        ConsumeCount();
+    }
 }

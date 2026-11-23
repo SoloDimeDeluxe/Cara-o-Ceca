@@ -177,6 +177,11 @@ namespace ReyesCuadra
                 lines.push_back(coinPrefix + "[Al golpear sin Cracking] Inflige " + DescribeStatusAmount(coinEffect.tremorWithoutCrackingPotency, coinEffect.tremorWithoutCrackingCount) + " de Tremor");
             }
 
+            if (coinEffect.convertsTremorToScorch)
+            {
+                lines.push_back(coinPrefix + "[Al golpear, si no perdió el clash] Convierte el Tremor del objetivo en Tremor - Scorch");
+            }
+
             if (coinEffect.burstTimes > 0)
             {
                 const std::string condition = coinEffect.burstOnlyWithoutCracking ? "[Al golpear sin Cracking]" : "[Al golpear]";

@@ -65,6 +65,10 @@ namespace ReyesCuadra
         int burstTimes = 0;
         bool burstOnlyWithoutCracking = false;
         int countLossAfterBurst = 0;
+
+        // [Al golpear]: convierte el Tremor del objetivo en Tremor - Scorch (antes del Burst de esta moneda),
+        // salvo que el que pega haya perdido el clash
+        bool convertsTremorToScorch = false;
     };
 
     // Efectos de una skill sobre los estados del objetivo (Tremor y Burn)

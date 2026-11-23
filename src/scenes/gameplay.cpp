@@ -93,7 +93,7 @@ namespace ReyesCuadra
     static const sf::Vector2f HELP_BOX_SIZE = { 940.0f, 700.0f };
     static const float HELP_PADDING = 30.0f;
     static const float HELP_TITLE_HEIGHT = 50.0f;
-    static const float HELP_LINE_HEIGHT = 22.0f;
+    static const float HELP_LINE_HEIGHT = 20.0f;
     static const float HELP_RULE_GAP = 6.0f;
     static const sf::Vector2f CLOSE_HELP_BUTTON_SIZE = { 220.0f, 48.0f };
     static const sf::FloatRect HELP_BUTTON_BOUNDS = sf::FloatRect({ 1100.0f, 330.0f }, { 150.0f, 28.0f });
@@ -173,7 +173,7 @@ namespace ReyesCuadra
     static const unsigned int HAND_HEADER_SIZE = 15;
     static const unsigned int GAME_OVER_TITLE_SIZE = 48;
     static const unsigned int HELP_TITLE_SIZE = 34;
-    static const unsigned int HELP_RULE_SIZE = 17;
+    static const unsigned int HELP_RULE_SIZE = 16;
     static const unsigned int TOOLTIP_TITLE_SIZE = 21;
     static const unsigned int TOOLTIP_TEXT_SIZE = 17;
 
@@ -213,7 +213,7 @@ namespace ReyesCuadra
         "7. Sinking: las skills de Yi Sang se lo ponen a Lei Heng. Cada vez que lo golpean pierde cordura igual a la potencia (si ya está en -45, pierde vida) y la cantidad baja 1.",
         "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos (también las de Lei Heng).",
         "9. Stagger: las marcas en las barras de vida son umbrales. Si la vida baja de uno, esa unidad queda staggereada: pierde lo que le quedaba del turno, no actúa el turno siguiente y mientras tanto recibe el doble de daño.",
-        "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang y la cantidad baja 1 al final de cada turno. Varias skills hacen Tremor Burst: tu próximo umbral de Stagger sube tantos puntos como la potencia de Tremor, así te staggerea antes.",
+        "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang y la cantidad baja 1 al final de cada turno. Varias skills hacen Tremor Burst: tu próximo umbral de Stagger sube tantos puntos como la potencia de Tremor, así te staggerea antes. Si Lei Heng no pierde el clash, Tajo y Cortador lo vuelven Tremor - Scorch: cada Burst además te hace (Tremor + Burn) / 2 de daño y baja 1 la cantidad de los dos.",
         "11. Burn: Lei Heng también te quema. Al final de cada turno recibís daño fijo igual a la potencia y la cantidad baja 1. Sus skills pegan más fuerte cuanto más Burn + Tremor tengas. Abajo de las barras, los estados se muestran como potencia·cantidad."
     };
 
@@ -355,7 +355,7 @@ namespace ReyesCuadra
 
         // Tremor y Burn que inflige cada skill de Lei Heng, moneda por moneda (sacado de los datos del juego).
         // Lo de "sin Cracking" se aplica siempre porque todavia no existe el Cracking.
-        // Sin "Tremor - Ignition" (no sabemos que hace todavia) y sin Rondas de Marca de Tigre.
+        // Sin Rondas de Marca de Tigre (las pasivas de Lei Heng).
 
         // Doble Corte - Explosion: poder final +1 cada 4 de (Burn + Tremor) del objetivo, maximo +4
         TargetStatusEffects doubleSlashEffects;
@@ -397,6 +397,7 @@ namespace ReyesCuadra
         explosiveSlashEffects.perCoin[0].tremorWithoutCrackingCount = 4;
         explosiveSlashEffects.perCoin[1].burnCount = 3;
         explosiveSlashEffects.perCoin[1].tremorCount = 3;
+        explosiveSlashEffects.perCoin[1].convertsTremorToScorch = true;
         explosiveSlashEffects.perCoin[2].burnPotency = 3;
         explosiveSlashEffects.perCoin[2].burnCount = 3;
         explosiveSlashEffects.perCoin[2].burstTimes = 1;
@@ -407,6 +408,7 @@ namespace ReyesCuadra
         // Cortador de enredos: su unica moneda hace Tremor Burst
         TargetStatusEffects tangleCutterEffects;
         tangleCutterEffects.perCoin.resize(1);
+        tangleCutterEffects.perCoin[0].convertsTremorToScorch = true;
         tangleCutterEffects.perCoin[0].burstTimes = 1;
         tangleCutterEffects.perCoin[0].burstOnlyWithoutCracking = true;
         tangleCutterEffects.perCoin[0].countLossAfterBurst = 1;
@@ -1759,7 +1761,7 @@ namespace ReyesCuadra
 
         if (tremor.IsActive())
         {
-            statusText += "   Tremor " + std::to_string(tremor.GetPotency()) + "·" + std::to_string(tremor.GetCount());
+            statusText += std::string(tremor.IsScorch() ? "   Tremor-Scorch " : "   Tremor ") + std::to_string(tremor.GetPotency()) + "·" + std::to_string(tremor.GetCount());
         }
 
         const float statusY = barY + HP_BAR_HEIGHT + POISE_TEXT_OFFSET_Y;

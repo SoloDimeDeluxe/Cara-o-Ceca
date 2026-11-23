@@ -15,6 +15,9 @@ namespace ReyesCuadra
     // Un golpe critico hace este multiplicador de dano (+20%)
     static const float CRITICAL_DAMAGE_MULTIPLIER = 1.2f;
 
+    // El dano del Tremor - Scorch es (potencia de Tremor + potencia de Burn) dividido esto
+    static const int SCORCH_DAMAGE_DIVISOR = 2;
+
     // Una unidad staggereada recibe el doble de dano de los golpes
     static const float STAGGERED_DAMAGE_MULTIPLIER = 2.0f;
 
@@ -50,6 +53,7 @@ namespace ReyesCuadra
         int sinkingDamage = 0;
         int sinkingSanityLoss = 0;
         int tremorBurstRaise = 0;
+        int scorchDamage = 0;
         int criticalHits = 0;
         int evadedHits = 0;
     };
@@ -75,7 +79,10 @@ namespace ReyesCuadra
 
     // Aplica el Burn y el Tremor de la moneda indicada sobre el objetivo y, si corresponde, le hace Tremor Burst.
     // Devuelve cuantos puntos subio el umbral de Stagger por los Burst (0 si no hubo).
-    static int ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target);
+    // Tambien hace los Tremor Burst de la moneda: anota cuanto subio el umbral y el dano del Scorch en result.
+    // canConvertToScorch es false cuando el que pega perdio el clash (pega con sus monedas irrompibles):
+    // en ese caso no convierte el Tremor en Scorch.
+    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool canConvertToScorch, AttackResult& result, CombatTimeline& timeline);
 
     // Aplica los efectos [Al golpear] de Sinking de la skill sobre el objetivo
     static void ApplyOnHitSinking(const Skill& skill, Unit& target);
@@ -276,13 +283,13 @@ namespace ReyesCuadra
         return (bonus > effects.maxFinalPowerBonus) ? effects.maxFinalPowerBonus : bonus;
     }
 
-    static int ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target)
+    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool canConvertToScorch, AttackResult& result, CombatTimeline& timeline)
     {
         const std::vector<CoinStatusEffect>& perCoin = skill.GetTargetStatusEffects().perCoin;
 
         if (coinIndex >= perCoin.size())
         {
-            return 0;
+            return;
         }
 
         const CoinStatusEffect& effect = perCoin[coinIndex];
@@ -318,15 +325,49 @@ namespace ReyesCuadra
             target.GetTremor().AddCount(tremorCount);
         }
 
+        // Si la moneda lo indica, el Tremor pasa a ser Tremor - Scorch (antes del Burst, como en el juego).
+        // No pasa si el que pega perdio el clash: solo si lo gano o si pega sin oposicion.
+        if (effect.convertsTremorToScorch && canConvertToScorch && !DidHitCrack())
+        {
+            target.GetTremor().ConvertToScorch();
+        }
+
         // El Burst va despues de poner los estados de esta moneda, y solo si se cumple su condicion
         const bool crackingConditionMet = !effect.burstOnlyWithoutCracking || !DidHitCrack();
-        int totalRaise = 0;
 
         if (effect.burstTimes > 0 && crackingConditionMet)
         {
-            for (int burstIndex = 0; burstIndex < effect.burstTimes; burstIndex++)
+            for (int burstIndex = 0; burstIndex < effect.burstTimes && !target.IsDead(); burstIndex++)
             {
-                totalRaise += target.TriggerTremorBurst();
+                // Sin Tremor el Burst no hace nada
+                if (!target.GetTremor().IsActive())
+                {
+                    break;
+                }
+
+                const bool isScorch = target.GetTremor().IsScorch();
+                const int raise = target.TriggerTremorBurst();
+
+                result.tremorBurstRaise += raise;
+                timeline.AddBanner(isScorch ? "TREMOR BURST - SCORCH" : "TREMOR BURST");
+                RecordStaggerIfAny(target, timeline);
+
+                // Scorch: dano igual a (Tremor + Burn) / 2 y despues baja 1 la cantidad de Tremor y de Burn
+                if (isScorch && !target.IsDead())
+                {
+                    const int scorchDamage = (target.GetTremor().GetPotency() + target.GetBurn().GetPotency()) / SCORCH_DAMAGE_DIVISOR;
+
+                    if (scorchDamage > 0)
+                    {
+                        target.TakeDamage(scorchDamage);
+                        result.scorchDamage += scorchDamage;
+                        timeline.AddHit(target, scorchDamage, false);
+                        RecordStaggerIfAny(target, timeline);
+                    }
+
+                    target.GetTremor().LoseOneCount();
+                    target.GetBurn().LoseOneCount();
+                }
             }
 
             for (int lossIndex = 0; lossIndex < effect.countLossAfterBurst; lossIndex++)
@@ -334,8 +375,6 @@ namespace ReyesCuadra
                 target.GetTremor().LoseOneCount();
             }
         }
-
-        return totalRaise;
     }
 
     static void ApplyOnHitSinking(const Skill& skill, Unit& target)
@@ -538,14 +577,8 @@ namespace ReyesCuadra
             ApplyOnHitSinking(skill, target);
 
             // Burn y Tremor de esta moneda (y Tremor Burst si la moneda lo tiene)
-            const int burstRaise = ApplyOnHitTargetStatuses(skill, static_cast<size_t>(coinIndex), target);
-
-            if (burstRaise > 0)
-            {
-                result.tremorBurstRaise += burstRaise;
-                timeline.AddBanner("TREMOR BURST");
-                RecordStaggerIfAny(target, timeline);
-            }
+            // Si solo pegan las irrompibles es porque perdio el clash: ahi no convierte a Scorch
+            ApplyOnHitTargetStatuses(skill, static_cast<size_t>(coinIndex), target, !onlyUnbreakable, result, timeline);
 
             // Efectos [Al golpear]
             if (effects.onHitPotency > 0)
@@ -613,6 +646,16 @@ namespace ReyesCuadra
             }
 
             extras += "Tremor Burst: umbral de Stagger +" + std::to_string(result.tremorBurstRaise) + "%";
+        }
+
+        if (result.scorchDamage > 0)
+        {
+            if (!extras.empty())
+            {
+                extras += ", ";
+            }
+
+            extras += "+" + std::to_string(result.scorchDamage) + " de daño por Tremor - Scorch";
         }
 
         if (result.criticalHits > 0)
