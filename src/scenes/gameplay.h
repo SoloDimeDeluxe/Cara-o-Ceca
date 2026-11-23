@@ -22,6 +22,12 @@ namespace ReyesCuadra
     // Cantidad de acciones de Yi Sang por turno: las pone en las columnas que quiera frenar
     const int PLAYER_MAX_ACTIONS = 3;
 
+    // Como en Limbus, cada accion de Yi Sang trae 2 skills sorteadas para elegir (pueden salir repetidas)
+    const int OPTIONS_PER_ACTION = 2;
+
+    // Botones de cada accion: las 2 opciones sorteadas y, al final, Esquivar (siempre disponible)
+    const int BUTTONS_PER_ACTION = OPTIONS_PER_ACTION + 1;
+
     // En que parte de la partida estamos
     enum class GameState
     {
@@ -63,8 +69,31 @@ namespace ReyesCuadra
         // Deja todo como al principio: vida llena, turno 1 y registro vacio
         void StartNewGame();
 
-        // Pide al patron las skills de Lei Heng para el turno actual y le pone S1 por defecto a todos los slots de Yi Sang
+        // Pide al patron las skills de Lei Heng para el turno actual y pone cada accion de Yi Sang en su columna
+        // (la accion 1 en la columna 1, etc.) con la primera de sus dos opciones
         void PrepareTurn();
+
+        // Sortea una skill de ataque para la mano de Yi Sang: S1 60%, S2 30%, S3 10%
+        int DrawSkillOption() const;
+
+        // Sortea de nuevo las dos opciones de todas las acciones (al empezar la partida)
+        void DealNewHand();
+
+        // Al terminar el turno se gastan las skills usadas y en su lugar salen otras nuevas.
+        // La que no se uso se queda para el turno siguiente. Esquivar gasta la primera opcion de esa accion.
+        void SpendUsedOptions();
+
+        // Skill que eligio una accion de Yi Sang (una de sus opciones o Esquivar)
+        const Skill* GetActionSkill(int actionIndex) const;
+
+        // Pone en playerActions (columna por columna) las skills de las acciones que estan ubicadas
+        void RebuildPlayerActions();
+
+        // Pone la accion de Yi Sang en la columna seleccionada con la opcion elegida (o Esquivar)
+        void AssignAction(int actionIndex, int choiceIndex);
+
+        // Cambia los textos de los botones de la mano (nombre de cada opcion sorteada) y marca la elegida
+        void RefreshHandButtons();
 
         // Recalcula el porcentaje de victoria de cada columna (se llama cada vez que cambia alguna skill)
         void UpdateWinChances();
@@ -142,6 +171,17 @@ namespace ReyesCuadra
 
         EnemyPattern enemyPattern;
 
+        // ---------- Mano de Yi Sang ----------
+
+        // Indice (dentro de playerSkills) de las 2 skills sorteadas de cada accion
+        std::array<std::array<int, OPTIONS_PER_ACTION>, PLAYER_MAX_ACTIONS> actionOptions;
+
+        // Que eligio cada accion: 0 o 1 = una de sus opciones, OPTIONS_PER_ACTION = Esquivar
+        std::array<int, PLAYER_MAX_ACTIONS> actionChoices;
+
+        // Columna donde esta puesta cada accion (-1 = no se usa este turno)
+        std::array<int, PLAYER_MAX_ACTIONS> actionColumns;
+
         // Lo que hace cada uno en cada slot este turno (nullptr = slot vacio)
         std::array<const Skill*, SLOT_COUNT> playerActions;
         std::vector<const Skill*> enemyActions;
@@ -152,6 +192,7 @@ namespace ReyesCuadra
         // true en las columnas sin accion de Yi Sang que cubriria una esquiva activa de una columna anterior
         std::array<bool, SLOT_COUNT> columnCoveredByEvade;
 
+        // Botones de la mano: BUTTONS_PER_ACTION por cada accion (accion 1 primero)
         std::vector<Button> skillButtons;
         Button fightButton;
         Button restartButton;

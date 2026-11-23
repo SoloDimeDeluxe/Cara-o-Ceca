@@ -23,9 +23,15 @@ namespace ReyesCuadra
         // Cambia el texto principal del boton (por ejemplo "¡Combatir!" -> "Saltear")
         void SetLabel(const std::string& text);
 
+        // Cambia el texto secundario (el chiquito de abajo)
+        void SetSubLabel(const std::string& text);
+
         // Texto corto que se muestra pegado al borde derecho del boton (por ejemplo, la chance de ganar el clash).
         // Con un texto vacio no se muestra nada.
         void SetRightText(const std::string& text, sf::Color color);
+
+        // Un boton seleccionado se dibuja con el borde dorado (por ejemplo, la skill elegida para una accion)
+        void SetSelected(bool selected);
 
         // Dibuja el boton, resaltado si el mouse esta encima
         void Draw(sf::RenderWindow& window, sf::Vector2f mousePosition) const;
@@ -38,6 +44,7 @@ namespace ReyesCuadra
         std::string rightText;
         sf::Color rightTextColor;
         bool isEnabled;
+        bool isSelected;
     };
 }
 

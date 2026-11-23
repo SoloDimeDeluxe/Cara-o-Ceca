@@ -5,6 +5,7 @@
 
 #include "combat/clash.h"
 #include "ui/text_utils.h"
+#include "utils/random.h"
 
 namespace ReyesCuadra
 {
@@ -67,8 +68,18 @@ namespace ReyesCuadra
     // Botones de skills (abajo a la izquierda) y registro de combate (abajo a la derecha)
     static const float SKILL_BUTTONS_TOP = 364.0f;
     static const float SKILL_BUTTON_WIDTH = 620.0f;
-    static const float SKILL_BUTTON_HEIGHT = 44.0f;
-    static const float SKILL_BUTTON_GAP = 8.0f;
+
+    // Mano de Yi Sang: una fila por accion, con un titulo arriba y los botones (2 opciones + Esquivar) abajo
+    static const float HAND_ROW_HEIGHT = 86.0f;
+    static const float HAND_HEADER_HEIGHT = 22.0f;
+    static const float HAND_BUTTON_HEIGHT = 52.0f;
+    static const float OPTION_BUTTON_WIDTH = 226.0f;
+    static const float EVADE_BUTTON_WIDTH = 152.0f;
+    static const float HAND_BUTTON_GAP = 8.0f;
+
+    // Probabilidad de que salga cada skill en la mano (S3 es lo que queda: 10%)
+    static const float SKILL_1_DRAW_CHANCE = 0.6f;
+    static const float SKILL_2_DRAW_CHANCE = 0.3f;
     static const float FIGHT_BUTTON_Y = 636.0f;
     static const float FIGHT_BUTTON_HEIGHT = 54.0f;
     static const sf::FloatRect COMBAT_LOG_AREA = sf::FloatRect({ 670.0f, 364.0f }, { 580.0f, 326.0f });
@@ -140,6 +151,7 @@ namespace ReyesCuadra
     static const unsigned int SLOT_SUMMARY_SIZE = 13;
     static const unsigned int VS_SIZE = 18;
     static const unsigned int HINT_SIZE = 15;
+    static const unsigned int HAND_HEADER_SIZE = 15;
     static const unsigned int GAME_OVER_TITLE_SIZE = 48;
     static const unsigned int HELP_TITLE_SIZE = 34;
     static const unsigned int HELP_RULE_SIZE = 17;
@@ -173,8 +185,8 @@ namespace ReyesCuadra
     // Reglas que se muestran en el cartel de "Como se juega", una por parrafo
     static const char* HELP_RULES[] =
     {
-        "1. Cada turno Lei Heng hace hasta 6 acciones, una por columna (fila de arriba). Vos tenés 3 acciones para Yi Sang (fila de abajo): ponelas en las columnas que quieras frenar.",
-        "2. Clic en una columna de Yi Sang y después en una skill para ponerla ahí; clic derecho para sacarla. Si Yi Sang tiene acción, choca con la de arriba (clash); si no, ese ataque te pega directo.",
+        "1. Cada turno Lei Heng hace hasta 6 acciones, una por columna (fila de arriba). Yi Sang tiene 3 acciones (abajo a la izquierda) y cada una trae 2 skills sorteadas: S1 sale seguido, S2 a veces y S3 poco. Esquivar siempre está.",
+        "2. Clic en una columna de Yi Sang y después en una skill de alguna acción para ponerla ahí; clic derecho la saca. La skill que usás se gasta y sale otra el turno siguiente; Esquivar gasta la 1ra opción de esa acción. Si no ponés nada en una columna, ese ataque te pega directo.",
         "3. En el clash los dos tiran sus monedas: cada cara suma poder. El que suma más le rompe una moneda al otro, y se repite hasta que uno se queda sin monedas.",
         "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda el clash.",
         "5. Esquivar no es un clash: tirás una sola vez y cada golpe que no supere tu número no te hace daño. Si esquivás todo, la esquiva sigue activa y enfrenta los próximos ataques que te entren directo, hasta que un golpe la supere o termine el turno. Ponela temprano para que cubra más.",
@@ -209,6 +221,9 @@ namespace ReyesCuadra
         , tangleCutter("Cortador de enredos", "Cortador de enredos", SkillType::Attack, 8, 1, 12, true)
         , tiantuiReload("Recargando espada tiantui", "Recargando espada tiantui", SkillType::Counter, 4, 2, 4, false)
         , enemyPattern(doubleSlash, tripleSlash, explosiveSlash, tangleCutter)
+        , actionOptions()
+        , actionChoices()
+        , actionColumns()
         , playerActions()
         , winChances()
         , columnCoveredByEvade()
@@ -298,21 +313,22 @@ namespace ReyesCuadra
         furiosoSinking.onHitWithoutCrackingCount = 3;
         playerSkills[SKILL_FURIOSO].SetSinkingEffects(furiosoSinking);
 
-        // Un boton por skill, uno abajo del otro
-        for (size_t skillIndex = 0; skillIndex < playerSkills.size(); skillIndex++)
+        // Botones de la mano: por cada accion, las 2 opciones sorteadas y Esquivar a la derecha.
+        // Los textos de las opciones se ponen en RefreshHandButtons, porque cambian cada turno.
+        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
         {
-            const Skill& skill = playerSkills[skillIndex];
-            const float buttonY = SKILL_BUTTONS_TOP + static_cast<float>(skillIndex) * (SKILL_BUTTON_HEIGHT + SKILL_BUTTON_GAP);
-            const std::string label = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + skill.GetName();
-            std::string subLabel = skill.GetSummary();
+            const float buttonY = SKILL_BUTTONS_TOP + static_cast<float>(actionIndex) * HAND_ROW_HEIGHT + HAND_HEADER_HEIGHT;
 
-            if (skill.IsLocked())
+            for (int optionIndex = 0; optionIndex < OPTIONS_PER_ACTION; optionIndex++)
             {
-                subLabel += "  -  Bloqueada";
+                const float buttonX = MARGIN + static_cast<float>(optionIndex) * (OPTION_BUTTON_WIDTH + HAND_BUTTON_GAP);
+
+                skillButtons.push_back(Button(gameFont, sf::FloatRect({ buttonX, buttonY }, { OPTION_BUTTON_WIDTH, HAND_BUTTON_HEIGHT }), "", " "));
             }
 
-            skillButtons.push_back(Button(gameFont, sf::FloatRect({ MARGIN, buttonY }, { SKILL_BUTTON_WIDTH, SKILL_BUTTON_HEIGHT }), label, subLabel));
-            skillButtons.back().SetEnabled(!skill.IsLocked());
+            const float evadeX = MARGIN + static_cast<float>(OPTIONS_PER_ACTION) * (OPTION_BUTTON_WIDTH + HAND_BUTTON_GAP);
+
+            skillButtons.push_back(Button(gameFont, sf::FloatRect({ evadeX, buttonY }, { EVADE_BUTTON_WIDTH, HAND_BUTTON_HEIGHT }), "Esquivar", "Gasta la 1ra"));
         }
 
         // Tremor y Burn que inflige cada skill de Lei Heng, moneda por moneda (sacado de los datos del juego).
@@ -505,8 +521,9 @@ namespace ReyesCuadra
         fightButton.SetLabel("¡Combatir!");
 
         combatLog.Clear();
-        combatLog.AddLine("Poné las 3 acciones de Yi Sang en las columnas que quieras frenar y apretá ¡Combatir!");
+        combatLog.AddLine("Elegí una skill de cada acción de Yi Sang, ponela en la columna que quieras frenar y apretá ¡Combatir!");
 
+        DealNewHand();
         PrepareTurn();
     }
 
@@ -522,20 +539,140 @@ namespace ReyesCuadra
             enemyActions = enemyPattern.GetActionsForTurn(turn);
         }
 
-        // Las 3 acciones de Yi Sang arrancan con S1 en las primeras 3 columnas (o ninguna si esta staggereado)
-        playerActions.fill(nullptr);
-
-        if (!player.IsStaggered())
+        // Cada accion de Yi Sang arranca en su columna (accion 1 en la columna 1...) con su primera opcion.
+        // Si esta staggereado, no pone ninguna.
+        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
         {
-            for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
-            {
-                playerActions[static_cast<size_t>(actionIndex)] = &playerSkills[SKILL_1];
-            }
+            actionChoices[static_cast<size_t>(actionIndex)] = 0;
+            actionColumns[static_cast<size_t>(actionIndex)] = player.IsStaggered() ? NO_COLUMN : actionIndex;
         }
 
         selectedSlot = 0;
 
+        RebuildPlayerActions();
+        RefreshHandButtons();
         UpdateWinChances();
+    }
+
+    int Gameplay::DrawSkillOption() const
+    {
+        if (RollChance(SKILL_1_DRAW_CHANCE))
+        {
+            return SKILL_1;
+        }
+
+        // Si no salio S1, queda repartir el 40% restante entre S2 (30%) y S3 (10%)
+        if (RollChance(SKILL_2_DRAW_CHANCE / (1.0f - SKILL_1_DRAW_CHANCE)))
+        {
+            return SKILL_2;
+        }
+
+        return SKILL_3;
+    }
+
+    void Gameplay::DealNewHand()
+    {
+        for (std::array<int, OPTIONS_PER_ACTION>& options : actionOptions)
+        {
+            for (int& option : options)
+            {
+                option = DrawSkillOption();
+            }
+        }
+    }
+
+    void Gameplay::SpendUsedOptions()
+    {
+        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
+        {
+            // Una accion que no se puso en ninguna columna no gasta nada
+            if (actionColumns[static_cast<size_t>(actionIndex)] == NO_COLUMN)
+            {
+                continue;
+            }
+
+            const int choice = actionChoices[static_cast<size_t>(actionIndex)];
+
+            // Esquivar gasta la skill que estaba primera en esa accion
+            const int spentOption = (choice == OPTIONS_PER_ACTION) ? 0 : choice;
+
+            actionOptions[static_cast<size_t>(actionIndex)][static_cast<size_t>(spentOption)] = DrawSkillOption();
+        }
+    }
+
+    const Skill* Gameplay::GetActionSkill(int actionIndex) const
+    {
+        const int choice = actionChoices[static_cast<size_t>(actionIndex)];
+
+        if (choice == OPTIONS_PER_ACTION)
+        {
+            return &playerSkills[SKILL_DEFENSE];
+        }
+
+        const int skillIndex = actionOptions[static_cast<size_t>(actionIndex)][static_cast<size_t>(choice)];
+
+        return &playerSkills[static_cast<size_t>(skillIndex)];
+    }
+
+    void Gameplay::RebuildPlayerActions()
+    {
+        playerActions.fill(nullptr);
+
+        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
+        {
+            const int column = actionColumns[static_cast<size_t>(actionIndex)];
+
+            if (column != NO_COLUMN)
+            {
+                playerActions[static_cast<size_t>(column)] = GetActionSkill(actionIndex);
+            }
+        }
+    }
+
+    void Gameplay::AssignAction(int actionIndex, int choiceIndex)
+    {
+        // Si en esa columna habia otra accion, esa otra queda sin usar (se puede poner en otra columna)
+        for (int otherAction = 0; otherAction < PLAYER_MAX_ACTIONS; otherAction++)
+        {
+            if (otherAction != actionIndex && actionColumns[static_cast<size_t>(otherAction)] == selectedSlot)
+            {
+                actionColumns[static_cast<size_t>(otherAction)] = NO_COLUMN;
+            }
+        }
+
+        // Si esta accion estaba en otra columna, se mueve a la seleccionada
+        actionColumns[static_cast<size_t>(actionIndex)] = selectedSlot;
+        actionChoices[static_cast<size_t>(actionIndex)] = choiceIndex;
+
+        RebuildPlayerActions();
+        RefreshHandButtons();
+        UpdateWinChances();
+    }
+
+    void Gameplay::RefreshHandButtons()
+    {
+        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
+        {
+            const bool isPlaced = actionColumns[static_cast<size_t>(actionIndex)] != NO_COLUMN;
+
+            for (int choiceIndex = 0; choiceIndex < BUTTONS_PER_ACTION; choiceIndex++)
+            {
+                Button& button = skillButtons[static_cast<size_t>(actionIndex * BUTTONS_PER_ACTION + choiceIndex)];
+
+                // Las opciones muestran la skill que salio sorteada; Esquivar siempre dice lo mismo
+                if (choiceIndex < OPTIONS_PER_ACTION)
+                {
+                    const int skillIndex = actionOptions[static_cast<size_t>(actionIndex)][static_cast<size_t>(choiceIndex)];
+                    const Skill& skill = playerSkills[static_cast<size_t>(skillIndex)];
+
+                    button.SetLabel(skill.GetShortName());
+                    button.SetSubLabel(skill.GetSummary());
+                }
+
+                button.SetSelected(isPlaced && actionChoices[static_cast<size_t>(actionIndex)] == choiceIndex);
+                button.SetEnabled(!player.IsStaggered());
+            }
+        }
     }
 
     void Gameplay::UpdateWinChances()
@@ -575,29 +712,31 @@ namespace ReyesCuadra
     {
         const Skill* enemySkill = (selectedSlot < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(selectedSlot)] : nullptr;
 
-        for (size_t skillIndex = 0; skillIndex < playerSkills.size(); skillIndex++)
+        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
         {
-            const Skill& playerSkill = playerSkills[skillIndex];
-            Button& button = skillButtons[skillIndex];
+            for (int choiceIndex = 0; choiceIndex < BUTTONS_PER_ACTION; choiceIndex++)
+            {
+                Button& button = skillButtons[static_cast<size_t>(actionIndex * BUTTONS_PER_ACTION + choiceIndex)];
 
-            if (playerSkill.IsLocked())
-            {
-                button.SetRightText("", TEXT_COLOR);
-            }
-            else if (enemySkill == nullptr)
-            {
-                // En ese slot Lei Heng no hace nada: no hay clash
-                button.SetRightText("Libre", DIM_TEXT_COLOR);
-            }
-            else if (playerSkill.IsDefensive() && enemySkill->IsDefensive())
-            {
-                button.SetRightText("-", DIM_TEXT_COLOR);
-            }
-            else
-            {
-                const float winChance = EstimateClashWinChance(player, playerSkill, enemy, *enemySkill);
+                // Skill que pondria este boton: la opcion sorteada o Esquivar
+                const int skillIndex = (choiceIndex < OPTIONS_PER_ACTION) ? actionOptions[static_cast<size_t>(actionIndex)][static_cast<size_t>(choiceIndex)] : static_cast<int>(SKILL_DEFENSE);
+                const Skill& playerSkill = playerSkills[static_cast<size_t>(skillIndex)];
 
-                button.SetRightText(FormatPercent(winChance), GetChanceColor(winChance));
+                if (enemySkill == nullptr)
+                {
+                    // En ese slot Lei Heng no hace nada: no hay clash
+                    button.SetRightText("Libre", DIM_TEXT_COLOR);
+                }
+                else if (playerSkill.IsDefensive() && enemySkill->IsDefensive())
+                {
+                    button.SetRightText("-", DIM_TEXT_COLOR);
+                }
+                else
+                {
+                    const float winChance = EstimateClashWinChance(player, playerSkill, enemy, *enemySkill);
+
+                    button.SetRightText(FormatPercent(winChance), GetChanceColor(winChance));
+                }
             }
         }
     }
@@ -793,6 +932,9 @@ namespace ReyesCuadra
 
         if (state == GameState::ChoosingSkills)
         {
+            // Las skills que se usaron este turno se gastan: en su lugar salen otras nuevas
+            SpendUsedOptions();
+
             turn++;
             PrepareTurn();
         }
@@ -904,21 +1046,15 @@ namespace ReyesCuadra
             }
         }
 
-        // Clic en una skill: se la pone a la columna seleccionada (si todavia quedan acciones libres)
+        // Clic en una skill de la mano: esa accion pasa a la columna seleccionada con esa skill
         for (size_t buttonIndex = 0; buttonIndex < skillButtons.size(); buttonIndex++)
         {
             if (skillButtons[buttonIndex].IsEnabled() && skillButtons[buttonIndex].Contains(clickPosition))
             {
-                const bool columnHasAction = playerActions[static_cast<size_t>(selectedSlot)] != nullptr;
+                const int actionIndex = static_cast<int>(buttonIndex) / BUTTONS_PER_ACTION;
+                const int choiceIndex = static_cast<int>(buttonIndex) % BUTTONS_PER_ACTION;
 
-                if (!columnHasAction && CountPlayerActions() >= PLAYER_MAX_ACTIONS)
-                {
-                    combatLog.AddLine("Ya usaste tus 3 acciones: hacé clic derecho en una para sacarla y ponerla en otra columna.");
-                    return;
-                }
-
-                playerActions[static_cast<size_t>(selectedSlot)] = &playerSkills[buttonIndex];
-                UpdateWinChances();
+                AssignAction(actionIndex, choiceIndex);
                 return;
             }
         }
@@ -945,8 +1081,18 @@ namespace ReyesCuadra
         {
             if (GetSlotBounds(slotIndex, true).contains(clickPosition))
             {
-                playerActions[static_cast<size_t>(slotIndex)] = nullptr;
+                // La accion que estaba en esa columna queda sin usar (no gasta su skill)
+                for (int& column : actionColumns)
+                {
+                    if (column == slotIndex)
+                    {
+                        column = NO_COLUMN;
+                    }
+                }
+
                 selectedSlot = slotIndex;
+                RebuildPlayerActions();
+                RefreshHandButtons();
                 UpdateWinChances();
                 return;
             }
@@ -1015,7 +1161,7 @@ namespace ReyesCuadra
         }
         else
         {
-            const std::string hint = "Acciones: " + std::to_string(CountPlayerActions()) + "/" + std::to_string(PLAYER_MAX_ACTIONS) + "  ·  Clic en una columna y después en una skill  ·  Clic derecho la saca  ·  Sin acción = te pegan directo";
+            const std::string hint = "Acciones: " + std::to_string(CountPlayerActions()) + "/" + std::to_string(PLAYER_MAX_ACTIONS) + "  ·  Clic en una columna y después en una skill de abajo  ·  Clic derecho la saca  ·  Sin acción = te pegan directo";
 
             DrawTextAt(window, font, hint, HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
         }
@@ -1093,6 +1239,25 @@ namespace ReyesCuadra
 
     void Gameplay::DrawSkillButtons(sf::RenderWindow& window) const
     {
+        // Arriba de cada fila: que accion es y en que columna esta puesta
+        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
+        {
+            const int column = actionColumns[static_cast<size_t>(actionIndex)];
+            const float headerY = SKILL_BUTTONS_TOP + static_cast<float>(actionIndex) * HAND_ROW_HEIGHT;
+            std::string header = "Acción " + std::to_string(actionIndex + 1);
+
+            if (column != NO_COLUMN)
+            {
+                header += "  ·  en la columna " + std::to_string(column + 1);
+            }
+            else if (!player.IsStaggered())
+            {
+                header += "  ·  sin usar (guarda sus skills)";
+            }
+
+            DrawTextAt(window, font, header, HAND_HEADER_SIZE, { MARGIN, headerY }, column != NO_COLUMN ? GOLD_COLOR : DIM_TEXT_COLOR);
+        }
+
         for (const Button& button : skillButtons)
         {
             button.Draw(window, mousePosition);
@@ -1102,10 +1267,13 @@ namespace ReyesCuadra
     void Gameplay::DrawSkillTooltip(sf::RenderWindow& window) const
     {
         // Skills de Yi Sang (botones de la lista)
-        for (size_t skillIndex = 0; skillIndex < skillButtons.size(); skillIndex++)
+        for (size_t buttonIndex = 0; buttonIndex < skillButtons.size(); buttonIndex++)
         {
-            if (skillButtons[skillIndex].Contains(mousePosition))
+            if (skillButtons[buttonIndex].Contains(mousePosition))
             {
+                const size_t actionIndex = buttonIndex / static_cast<size_t>(BUTTONS_PER_ACTION);
+                const size_t choiceIndex = buttonIndex % static_cast<size_t>(BUTTONS_PER_ACTION);
+                const size_t skillIndex = (choiceIndex < static_cast<size_t>(OPTIONS_PER_ACTION)) ? static_cast<size_t>(actionOptions[actionIndex][choiceIndex]) : static_cast<size_t>(SKILL_DEFENSE);
                 const std::string title = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + playerSkills[skillIndex].GetName();
 
                 DrawSkillDetails(window, playerSkills[skillIndex], title);

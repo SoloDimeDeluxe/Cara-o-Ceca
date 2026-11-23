@@ -12,12 +12,14 @@ namespace ReyesCuadra
     static const float LABEL_OFFSET_Y = 2.0f;
     static const float SUB_LABEL_OFFSET_Y = 22.0f;
     static const float BORDER_THICKNESS = 2.0f;
+    static const float SELECTED_BORDER_THICKNESS = 4.0f;
 
     // Colores segun el estado del boton
     static const sf::Color NORMAL_COLOR = sf::Color(45, 40, 48);
     static const sf::Color HOVER_COLOR = sf::Color(70, 60, 72);
     static const sf::Color DISABLED_COLOR = sf::Color(32, 30, 34);
     static const sf::Color BORDER_COLOR = sf::Color(120, 100, 80);
+    static const sf::Color SELECTED_BORDER_COLOR = sf::Color(220, 190, 120);
     static const sf::Color LABEL_COLOR = sf::Color(235, 230, 220);
     static const sf::Color SUB_LABEL_COLOR = sf::Color(180, 170, 155);
     static const sf::Color DISABLED_TEXT_COLOR = sf::Color(100, 95, 90);
@@ -30,6 +32,7 @@ namespace ReyesCuadra
         , rightText("")
         , rightTextColor(LABEL_COLOR)
         , isEnabled(true)
+        , isSelected(false)
     {
     }
 
@@ -48,9 +51,19 @@ namespace ReyesCuadra
         isEnabled = enabled;
     }
 
+    void Button::SetSelected(bool selected)
+    {
+        isSelected = selected;
+    }
+
     void Button::SetLabel(const std::string& text)
     {
         label = text;
+    }
+
+    void Button::SetSubLabel(const std::string& text)
+    {
+        subLabel = text;
     }
 
     void Button::SetRightText(const std::string& text, sf::Color color)
@@ -75,8 +88,8 @@ namespace ReyesCuadra
         sf::RectangleShape shape(bounds.size);
         shape.setPosition(bounds.position);
         shape.setFillColor(fillColor);
-        shape.setOutlineColor(BORDER_COLOR);
-        shape.setOutlineThickness(BORDER_THICKNESS);
+        shape.setOutlineColor(isSelected ? SELECTED_BORDER_COLOR : BORDER_COLOR);
+        shape.setOutlineThickness(isSelected ? SELECTED_BORDER_THICKNESS : BORDER_THICKNESS);
         window.draw(shape);
 
         const sf::Color labelColor = isEnabled ? LABEL_COLOR : DISABLED_TEXT_COLOR;
