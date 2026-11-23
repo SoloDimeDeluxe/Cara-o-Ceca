@@ -16,6 +16,24 @@ namespace ReyesCuadra
         Counter
     };
 
+    // Cuanto Poise genera una skill y en que momento (todo arranca en 0 = no genera nada)
+    struct PoiseEffects
+    {
+        // [Al usarla]: apenas se usa la skill, antes del clash
+        int onUsePotency = 0;
+        int onUseCount = 0;
+
+        // [Al golpear]: por cada moneda que pega
+        int onHitPotency = 0;
+        int onHitCount = 0;
+
+        // [Al hacer critico]: por cada golpe critico
+        int onCriticalCount = 0;
+
+        // Si es true, la skill gana +1 de poder por moneda cada 6 de potencia de Poise (maximo +2)
+        bool gainsCoinPowerFromPoise = false;
+    };
+
     // Skill que usa una unidad en un slot: poder base mas una lista de monedas
     class Skill
     {
@@ -42,6 +60,13 @@ namespace ReyesCuadra
         // Resumen de los numeros para mostrar en pantalla, por ejemplo "Base 4 | 3 monedas +3"
         std::string GetSummary() const;
 
+        // Efectos de Poise de la skill
+        const PoiseEffects& GetPoiseEffects() const;
+        void SetPoiseEffects(const PoiseEffects& effects);
+
+        // Resumen de lo que da de Poise, por ejemplo "Poise: usar +2 cant. · golpe +2 pot." (vacio si no da nada)
+        std::string GetPoiseSummary() const;
+
         // Una skill bloqueada se ve en la lista pero no se puede elegir (por ejemplo Furioso-Replica hasta desbloquearla)
         bool IsLocked() const;
         void SetLocked(bool locked);
@@ -52,6 +77,7 @@ namespace ReyesCuadra
         SkillType type;
         int basePower;
         std::vector<Coin> coins;
+        PoiseEffects poiseEffects;
         bool isLocked;
     };
 }

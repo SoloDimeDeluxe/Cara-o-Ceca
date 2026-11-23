@@ -27,6 +27,9 @@
     <ClCompile Include="src\combat\enemy_pattern.cpp">
       <Filter>combat</Filter>
     </ClCompile>
+    <ClCompile Include="src\combat\poise.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
     <ClCompile Include="src\combat\skill.cpp">
       <Filter>combat</Filter>
     </ClCompile>
@@ -61,6 +64,9 @@
       <Filter>combat</Filter>
     </ClInclude>
     <ClInclude Include="src\combat\enemy_pattern.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\poise.h">
       <Filter>combat</Filter>
     </ClInclude>
     <ClInclude Include="src\combat\skill.h">

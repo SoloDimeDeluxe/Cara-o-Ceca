@@ -40,6 +40,7 @@ namespace ReyesCuadra
     static const float SCREEN_WIDTH = 1280.0f;
     static const float SCREEN_HEIGHT = 720.0f;
     static const float TURN_LABEL_Y = 24.0f;
+    static const float POISE_TEXT_OFFSET_Y = 4.0f;
 
     // Tarjetas de los slots: una fila para Lei Heng arriba y otra para Yi Sang abajo
     static const float SLOTS_LEFT = 30.0f;
@@ -70,7 +71,7 @@ namespace ReyesCuadra
     static const float RESTART_BUTTON_OFFSET_Y = 60.0f;
 
     // Cartel de "Como se juega" y el boton que lo abre
-    static const sf::Vector2f HELP_BOX_SIZE = { 820.0f, 480.0f };
+    static const sf::Vector2f HELP_BOX_SIZE = { 820.0f, 580.0f };
     static const float HELP_PADDING = 30.0f;
     static const float HELP_TITLE_HEIGHT = 56.0f;
     static const float HELP_LINE_HEIGHT = 25.0f;
@@ -87,6 +88,7 @@ namespace ReyesCuadra
 
     static const unsigned int NAME_SIZE = 26;
     static const unsigned int HP_TEXT_SIZE = 16;
+    static const unsigned int POISE_TEXT_SIZE = 15;
     static const unsigned int TURN_SIZE = 30;
     static const unsigned int SLOT_NAME_SIZE = 16;
     static const unsigned int SLOT_SUMMARY_SIZE = 13;
@@ -125,7 +127,8 @@ namespace ReyesCuadra
         "2. Cada slot choca contra la skill de Lei Heng que tiene justo arriba. Eso es un clash.",
         "3. En el clash los dos tiran sus monedas: cada cara suma poder. El que suma más le rompe una moneda al otro, y se repite hasta que uno se queda sin monedas.",
         "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes.",
-        "5. Esquivar no es un clash: tirás una sola vez y cada golpe de Lei Heng que no supere tu número no te hace daño. Ahí el % es tu chance de esquivar todos los golpes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda un clash."
+        "5. Esquivar no es un clash: tirás una sola vez y cada golpe de Lei Heng que no supere tu número no te hace daño. Ahí el % es tu chance de esquivar todos los golpes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda un clash.",
+        "6. Poise: las skills de Yi Sang lo van cargando. Cada punto de potencia da 5% de chance de crítico (+20% de daño) y cada 6 de potencia suman +1 al poder de cada moneda. La cantidad baja 1 por crítico y 1 al final del turno; si llega a 0, se pierde."
     };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
@@ -174,13 +177,51 @@ namespace ReyesCuadra
         // Furioso-Replica se desbloquea mas adelante (con la mecanica de las 9 skills seguidas)
         playerSkills[SKILL_FURIOSO].SetLocked(true);
 
+        // Poise que genera cada skill de Yi Sang (sacado de la wiki, uptie 4). Todas sus skills de ataque ganan
+        // +1 de poder por moneda cada 6 de potencia de Poise (maximo +2).
+        PoiseEffects skill1Poise;
+        skill1Poise.onUseCount = 2;
+        skill1Poise.onHitPotency = 2;
+        skill1Poise.gainsCoinPowerFromPoise = true;
+        playerSkills[SKILL_1].SetPoiseEffects(skill1Poise);
+
+        PoiseEffects skill2Poise;
+        skill2Poise.onUsePotency = 3;
+        skill2Poise.onHitCount = 2;
+        skill2Poise.gainsCoinPowerFromPoise = true;
+        playerSkills[SKILL_2].SetPoiseEffects(skill2Poise);
+
+        PoiseEffects skill3Poise;
+        skill3Poise.onUseCount = 3;
+        skill3Poise.onHitPotency = 3;
+        skill3Poise.onCriticalCount = 1;
+        skill3Poise.gainsCoinPowerFromPoise = true;
+        playerSkills[SKILL_3].SetPoiseEffects(skill3Poise);
+
+        PoiseEffects furiosoPoise;
+        furiosoPoise.onUsePotency = 3;
+        furiosoPoise.onUseCount = 3;
+        furiosoPoise.onHitPotency = 1;
+        furiosoPoise.gainsCoinPowerFromPoise = true;
+        playerSkills[SKILL_FURIOSO].SetPoiseEffects(furiosoPoise);
+
         // Un boton por skill, uno abajo del otro
         for (size_t skillIndex = 0; skillIndex < playerSkills.size(); skillIndex++)
         {
             const Skill& skill = playerSkills[skillIndex];
             const float buttonY = SKILL_BUTTONS_TOP + static_cast<float>(skillIndex) * (SKILL_BUTTON_HEIGHT + SKILL_BUTTON_GAP);
             const std::string label = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + skill.GetName();
-            const std::string subLabel = skill.IsLocked() ? skill.GetSummary() + "  -  Bloqueada" : skill.GetSummary();
+            std::string subLabel = skill.GetSummary();
+
+            if (!skill.GetPoiseSummary().empty())
+            {
+                subLabel += "  ·  " + skill.GetPoiseSummary();
+            }
+
+            if (skill.IsLocked())
+            {
+                subLabel += "  -  Bloqueada";
+            }
 
             skillButtons.push_back(Button(gameFont, sf::FloatRect({ MARGIN, buttonY }, { SKILL_BUTTON_WIDTH, SKILL_BUTTON_HEIGHT }), label, subLabel));
             skillButtons.back().SetEnabled(!skill.IsLocked());
@@ -229,8 +270,8 @@ namespace ReyesCuadra
 
     void Gameplay::StartNewGame()
     {
-        player.ResetHp();
-        enemy.ResetHp();
+        player.Reset();
+        enemy.Reset();
         turn = 1;
         state = GameState::ChoosingSkills;
 
@@ -261,7 +302,7 @@ namespace ReyesCuadra
             // Solo hay clash si estan las dos skills y al menos una de las dos ataca
             const bool hasClash = playerSkill != nullptr && enemySkill != nullptr && !(playerSkill->IsDefensive() && enemySkill->IsDefensive());
 
-            winChances[static_cast<size_t>(slotIndex)] = hasClash ? EstimateClashWinChance(*playerSkill, *enemySkill) : -1.0f;
+            winChances[static_cast<size_t>(slotIndex)] = hasClash ? EstimateClashWinChance(player, *playerSkill, enemy, *enemySkill) : -1.0f;
         }
 
         // Si cambiaron las skills o el slot seleccionado, tambien cambian los numeros de los botones
@@ -292,7 +333,7 @@ namespace ReyesCuadra
             }
             else
             {
-                const float winChance = EstimateClashWinChance(playerSkill, *enemySkill);
+                const float winChance = EstimateClashWinChance(player, playerSkill, enemy, *enemySkill);
 
                 button.SetRightText(FormatPercent(winChance), GetChanceColor(winChance));
             }
@@ -316,6 +357,10 @@ namespace ReyesCuadra
 
             ResolveColumn(player, playerSkill, enemy, enemySkill, combatLog);
         }
+
+        // Al final del turno, la cantidad de Poise baja 1
+        player.GetPoise().OnTurnEnd();
+        enemy.GetPoise().OnTurnEnd();
 
         if (enemy.IsDead())
         {
@@ -626,5 +671,23 @@ namespace ReyesCuadra
 
         const std::string hpText = std::to_string(unit.GetHp()) + " / " + std::to_string(unit.GetMaxHp());
         DrawTextCentered(window, font, hpText, HP_TEXT_SIZE, sf::FloatRect({ barX, barY }, { HP_BAR_WIDTH, HP_BAR_HEIGHT }), TEXT_COLOR);
+
+        // Abajo de la barra se muestra el Poise, si tiene
+        const Poise& poise = unit.GetPoise();
+
+        if (poise.IsActive())
+        {
+            const std::string poiseText = "Poise: " + std::to_string(poise.GetPotency()) + " potencia · " + std::to_string(poise.GetCount()) + " cantidad (" + FormatPercent(poise.GetCriticalChance()) + " de crítico)";
+            const sf::Vector2f poisePosition = { barX, barY + HP_BAR_HEIGHT + POISE_TEXT_OFFSET_Y };
+
+            if (isRightSide)
+            {
+                DrawTextRightAligned(window, font, poiseText, POISE_TEXT_SIZE, { barX + HP_BAR_WIDTH, poisePosition.y }, GOLD_COLOR);
+            }
+            else
+            {
+                DrawTextAt(window, font, poiseText, POISE_TEXT_SIZE, poisePosition, GOLD_COLOR);
+            }
+        }
     }
 }

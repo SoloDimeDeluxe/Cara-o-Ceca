@@ -1,5 +1,6 @@
 #include "combat/clash.h"
 
+#include <cmath>
 #include <string>
 
 namespace ReyesCuadra
@@ -10,6 +11,13 @@ namespace ReyesCuadra
     // Cantidad de clashes de prueba que se simulan para calcular el porcentaje de victoria
     static const int WIN_CHANCE_SIMULATIONS = 1000;
 
+    // Un golpe critico hace este multiplicador de dano (+20%)
+    static const float CRITICAL_DAMAGE_MULTIPLIER = 1.2f;
+
+    // Bonus de poder de moneda por Poise: +1 cada 6 de potencia, hasta +2
+    static const int POISE_PER_COIN_POWER = 6;
+    static const int MAX_POISE_COIN_POWER_BONUS = 2;
+
     // Resultado de tirar las monedas de un clash (sin aplicar el dano)
     struct ClashOutcome
     {
@@ -18,20 +26,43 @@ namespace ReyesCuadra
         int rounds;
     };
 
-    // Tira las primeras "coinsToFlip" monedas de la skill y devuelve el poder total (base + caras)
-    static int RollClashPower(const Skill& skill, int coinsToFlip);
+    // Resultado de un ataque: cuanto dano hizo y cuantos golpes fueron criticos o se esquivaron
+    struct AttackResult
+    {
+        int damage = 0;
+        int criticalHits = 0;
+        int evadedHits = 0;
+    };
+
+    // Devuelve cuanto poder extra suma cada moneda de la skill segun la potencia de Poise indicada
+    static int GetCoinPowerBonus(const Skill& skill, int poisePotency);
+
+    // Igual que la anterior pero "adivinando" la potencia que va a tener la unidad despues del [Al usarla] de la skill.
+    // Se usa en las simulaciones, que no pueden cambiar el Poise de verdad.
+    static int PredictCoinPowerBonus(const Unit& unit, const Skill& skill);
+
+    // Aplica los efectos [Al usarla] de la skill sobre quien la usa (por ejemplo, ganar Poise)
+    static void ApplyOnUseEffects(Unit& user, const Skill& skill);
+
+    // Tira las primeras "coinsToFlip" monedas de la skill y devuelve el poder total (base + caras * (poder + bonus))
+    static int RollClashPower(const Skill& skill, int coinsToFlip, int coinPowerBonus);
 
     // Hace las rondas del clash: cada ronda tiran todas las monedas que les quedan y el que saca menos pierde una moneda.
     // Si empatan, se repite. Termina cuando a uno no le quedan monedas.
-    static ClashOutcome SimulateClash(const Skill& playerSkill, const Skill& enemySkill);
+    static ClashOutcome SimulateClash(const Skill& playerSkill, int playerBonus, const Skill& enemySkill, int enemyBonus);
 
     // Ataca al objetivo con las primeras "coinsToUse" monedas de la skill. El poder va subiendo moneda por moneda
     // (base, base + primera cara, etc.) y cada moneda hace tanto dano como el poder que hay en ese momento.
-    // Si onlyUnbreakable es true, solo pegan las monedas irrompibles. Devuelve el dano total que hizo.
-    static int PerformAttack(const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable);
+    // Cada golpe puede ser critico segun el Poise del atacante, y aplica los efectos [Al golpear].
+    // Si onlyUnbreakable es true, solo pegan las monedas irrompibles.
+    // Si evadePower es mayor o igual a 0, el objetivo esta esquivando: solo pegan los golpes que superan ese numero.
+    static AttackResult PerformAttack(Unit& attacker, const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable, int evadePower);
 
     // Cuenta cuantas monedas irrompibles tiene la skill
     static int CountUnbreakableCoins(const Skill& skill);
+
+    // Arma el texto " (2 criticos)" para el registro, o nada si no hubo criticos
+    static std::string DescribeCriticals(int criticalHits);
 
     // Ataque sin oposicion: la skill pega con todas sus monedas (las defensas solas no hacen nada)
     static void ResolveOneSidedAction(Unit& attacker, const Skill& skill, Unit& target, CombatLog& log);
@@ -42,22 +73,26 @@ namespace ReyesCuadra
     // Devuelve true si "evadeSkill" es una esquiva y "otherSkill" es algo que pega (ataque o contraataque)
     static bool IsEvadeAgainstAttack(const Skill& evadeSkill, const Skill& otherSkill);
 
-    // Tira una sola vez las monedas de la esquiva y devuelve el numero que hay que superar para pegarle
-    static int RollEvadePower(const Skill& evadeSkill);
-
-    // Hace el ataque contra alguien que esquiva: la esquiva NO es un clash y no rompe monedas.
-    // El atacante pega moneda por moneda como siempre, pero solo hacen dano los golpes cuyo poder supera al de la esquiva.
-    // Devuelve el dano total y guarda en evadedHits cuantos golpes se esquivaron.
-    static int PerformAttackAgainstEvade(const Skill& attackSkill, int evadePower, Unit& target, int& evadedHits);
-
     // Simula una esquiva sin hacer dano: devuelve true si se esquivaron todos los golpes
-    static bool SimulateFullEvade(const Skill& evadeSkill, const Skill& attackSkill);
+    static bool SimulateFullEvade(const Skill& evadeSkill, int evadeBonus, const Skill& attackSkill, int attackBonus);
 
-    // Resuelve la esquiva de verdad (con dano) y lo anota en el registro
+    // Resuelve la esquiva de verdad: la esquiva NO es un clash y no rompe monedas. Se tira una sola vez y
+    // el atacante pega moneda por moneda; solo hacen dano los golpes cuyo poder supera al de la esquiva.
     static void ResolveEvade(Unit& evader, const Skill& evadeSkill, Unit& attacker, const Skill& attackSkill, CombatLog& log);
 
     void ResolveColumn(Unit& player, const Skill* playerSkill, Unit& enemy, const Skill* enemySkill, CombatLog& log)
     {
+        // Lo primero es el [Al usarla] de cada skill, asi el Poise ganado ya cuenta para el clash
+        if (playerSkill != nullptr)
+        {
+            ApplyOnUseEffects(player, *playerSkill);
+        }
+
+        if (enemySkill != nullptr)
+        {
+            ApplyOnUseEffects(enemy, *enemySkill);
+        }
+
         if (playerSkill != nullptr && enemySkill != nullptr)
         {
             // La esquiva no clashea: el otro ataca igual y se ve cuantos golpes se esquivan
@@ -84,8 +119,10 @@ namespace ReyesCuadra
         }
     }
 
-    float EstimateClashWinChance(const Skill& playerSkill, const Skill& enemySkill)
+    float EstimateClashWinChance(const Unit& player, const Skill& playerSkill, const Unit& enemy, const Skill& enemySkill)
     {
+        const int playerBonus = PredictCoinPowerBonus(player, playerSkill);
+        const int enemyBonus = PredictCoinPowerBonus(enemy, enemySkill);
         int playerWins = 0;
 
         for (int simulation = 0; simulation < WIN_CHANCE_SIMULATIONS; simulation++)
@@ -95,16 +132,16 @@ namespace ReyesCuadra
             if (IsEvadeAgainstAttack(playerSkill, enemySkill))
             {
                 // Si el jugador esquiva, "ganar" es esquivar todos los golpes
-                playerWon = SimulateFullEvade(playerSkill, enemySkill);
+                playerWon = SimulateFullEvade(playerSkill, playerBonus, enemySkill, enemyBonus);
             }
             else if (IsEvadeAgainstAttack(enemySkill, playerSkill))
             {
                 // Si el enemigo esquiva, "ganar" es que al menos un golpe del jugador entre
-                playerWon = !SimulateFullEvade(enemySkill, playerSkill);
+                playerWon = !SimulateFullEvade(enemySkill, enemyBonus, playerSkill, playerBonus);
             }
             else
             {
-                playerWon = SimulateClash(playerSkill, enemySkill).playerWon;
+                playerWon = SimulateClash(playerSkill, playerBonus, enemySkill, enemyBonus).playerWon;
             }
 
             if (playerWon)
@@ -116,7 +153,48 @@ namespace ReyesCuadra
         return static_cast<float>(playerWins) / static_cast<float>(WIN_CHANCE_SIMULATIONS);
     }
 
-    static int RollClashPower(const Skill& skill, int coinsToFlip)
+    static int GetCoinPowerBonus(const Skill& skill, int poisePotency)
+    {
+        if (!skill.GetPoiseEffects().gainsCoinPowerFromPoise)
+        {
+            return 0;
+        }
+
+        const int bonus = poisePotency / POISE_PER_COIN_POWER;
+
+        return (bonus > MAX_POISE_COIN_POWER_BONUS) ? MAX_POISE_COIN_POWER_BONUS : bonus;
+    }
+
+    static int PredictCoinPowerBonus(const Unit& unit, const Skill& skill)
+    {
+        const PoiseEffects& effects = skill.GetPoiseEffects();
+        int predictedPotency = unit.GetPoise().GetPotency() + effects.onUsePotency;
+
+        // Si gana cantidad sin tener Poise, arranca con 1 de potencia
+        if (predictedPotency == 0 && effects.onUseCount > 0)
+        {
+            predictedPotency = 1;
+        }
+
+        return GetCoinPowerBonus(skill, predictedPotency);
+    }
+
+    static void ApplyOnUseEffects(Unit& user, const Skill& skill)
+    {
+        const PoiseEffects& effects = skill.GetPoiseEffects();
+
+        if (effects.onUsePotency > 0)
+        {
+            user.GetPoise().AddPotency(effects.onUsePotency);
+        }
+
+        if (effects.onUseCount > 0)
+        {
+            user.GetPoise().AddCount(effects.onUseCount);
+        }
+    }
+
+    static int RollClashPower(const Skill& skill, int coinsToFlip, int coinPowerBonus)
     {
         const std::vector<Coin>& coins = skill.GetCoins();
         int power = skill.GetBasePower();
@@ -125,14 +203,14 @@ namespace ReyesCuadra
         {
             if (coins[static_cast<size_t>(coinIndex)].Flip())
             {
-                power += coins[static_cast<size_t>(coinIndex)].GetPower();
+                power += coins[static_cast<size_t>(coinIndex)].GetPower() + coinPowerBonus;
             }
         }
 
         return power;
     }
 
-    static ClashOutcome SimulateClash(const Skill& playerSkill, const Skill& enemySkill)
+    static ClashOutcome SimulateClash(const Skill& playerSkill, int playerBonus, const Skill& enemySkill, int enemyBonus)
     {
         int playerCoins = playerSkill.GetCoinCount();
         int enemyCoins = enemySkill.GetCoinCount();
@@ -140,8 +218,8 @@ namespace ReyesCuadra
 
         while (playerCoins > 0 && enemyCoins > 0 && rounds < MAX_CLASH_ROUNDS)
         {
-            const int playerPower = RollClashPower(playerSkill, playerCoins);
-            const int enemyPower = RollClashPower(enemySkill, enemyCoins);
+            const int playerPower = RollClashPower(playerSkill, playerCoins, playerBonus);
+            const int enemyPower = RollClashPower(enemySkill, enemyCoins, enemyBonus);
 
             if (playerPower > enemyPower)
             {
@@ -163,11 +241,12 @@ namespace ReyesCuadra
         return outcome;
     }
 
-    static int PerformAttack(const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable)
+    static AttackResult PerformAttack(Unit& attacker, const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable, int evadePower)
     {
         const std::vector<Coin>& coins = skill.GetCoins();
+        const PoiseEffects& effects = skill.GetPoiseEffects();
+        AttackResult result;
         int power = skill.GetBasePower();
-        int totalDamage = 0;
 
         for (int coinIndex = 0; coinIndex < coinsToUse && !target.IsDead(); coinIndex++)
         {
@@ -178,19 +257,48 @@ namespace ReyesCuadra
                 continue;
             }
 
+            // El bonus se recalcula en cada moneda porque el Poise puede subir golpe a golpe
             if (coin.Flip())
             {
-                power += coin.GetPower();
+                power += coin.GetPower() + GetCoinPowerBonus(skill, attacker.GetPoise().GetPotency());
             }
 
-            // El poder nunca hace dano negativo
-            const int hitDamage = (power > 0) ? power : 0;
+            // Si el objetivo esquiva, para pegar hay que superar su numero (si empata, se esquiva)
+            if (evadePower >= 0 && power <= evadePower)
+            {
+                result.evadedHits++;
+                continue;
+            }
+
+            int hitDamage = (power > 0) ? power : 0;
+
+            if (attacker.GetPoise().RollCritical())
+            {
+                hitDamage = static_cast<int>(std::round(static_cast<float>(hitDamage) * CRITICAL_DAMAGE_MULTIPLIER));
+                result.criticalHits++;
+
+                if (effects.onCriticalCount > 0)
+                {
+                    attacker.GetPoise().AddCount(effects.onCriticalCount);
+                }
+            }
 
             target.TakeDamage(hitDamage);
-            totalDamage += hitDamage;
+            result.damage += hitDamage;
+
+            // Efectos [Al golpear]
+            if (effects.onHitPotency > 0)
+            {
+                attacker.GetPoise().AddPotency(effects.onHitPotency);
+            }
+
+            if (effects.onHitCount > 0)
+            {
+                attacker.GetPoise().AddCount(effects.onHitCount);
+            }
         }
 
-        return totalDamage;
+        return result;
     }
 
     static int CountUnbreakableCoins(const Skill& skill)
@@ -208,6 +316,16 @@ namespace ReyesCuadra
         return unbreakableCount;
     }
 
+    static std::string DescribeCriticals(int criticalHits)
+    {
+        if (criticalHits <= 0)
+        {
+            return "";
+        }
+
+        return (criticalHits == 1) ? " (1 crítico)" : " (" + std::to_string(criticalHits) + " críticos)";
+    }
+
     static void ResolveOneSidedAction(Unit& attacker, const Skill& skill, Unit& target, CombatLog& log)
     {
         // Esquivar o contraatacar sin nadie enfrente no hace nada
@@ -217,9 +335,9 @@ namespace ReyesCuadra
             return;
         }
 
-        const int damage = PerformAttack(skill, skill.GetCoinCount(), target, false);
+        const AttackResult result = PerformAttack(attacker, skill, skill.GetCoinCount(), target, false, -1);
 
-        log.AddLine(attacker.GetName() + " ataca sin oposición con " + skill.GetShortName() + ": " + std::to_string(damage) + " de daño.");
+        log.AddLine(attacker.GetName() + " ataca sin oposición con " + skill.GetShortName() + ": " + std::to_string(result.damage) + " de daño" + DescribeCriticals(result.criticalHits) + ".");
     }
 
     static void ResolveClash(Unit& player, const Skill& playerSkill, Unit& enemy, const Skill& enemySkill, CombatLog& log)
@@ -231,7 +349,9 @@ namespace ReyesCuadra
             return;
         }
 
-        const ClashOutcome outcome = SimulateClash(playerSkill, enemySkill);
+        const int playerBonus = GetCoinPowerBonus(playerSkill, player.GetPoise().GetPotency());
+        const int enemyBonus = GetCoinPowerBonus(enemySkill, enemy.GetPoise().GetPotency());
+        const ClashOutcome outcome = SimulateClash(playerSkill, playerBonus, enemySkill, enemyBonus);
 
         Unit& winner = outcome.playerWon ? player : enemy;
         Unit& loser = outcome.playerWon ? enemy : player;
@@ -245,9 +365,9 @@ namespace ReyesCuadra
 
         if (winnerSkill.DealsDamageOnWin())
         {
-            const int damage = PerformAttack(winnerSkill, outcome.winnerCoinsLeft, loser, false);
+            const AttackResult result = PerformAttack(winner, winnerSkill, outcome.winnerCoinsLeft, loser, false, -1);
 
-            line += " y pega " + std::to_string(damage) + " de daño.";
+            line += " y pega " + std::to_string(result.damage) + " de daño" + DescribeCriticals(result.criticalHits) + ".";
         }
         else
         {
@@ -259,9 +379,9 @@ namespace ReyesCuadra
         // Las monedas irrompibles del que perdio pegan igual despues del ganador (si sigue vivo)
         if (!loser.IsDead() && !loserSkill.IsDefensive() && CountUnbreakableCoins(loserSkill) > 0)
         {
-            const int damage = PerformAttack(loserSkill, loserSkill.GetCoinCount(), winner, true);
+            const AttackResult result = PerformAttack(loser, loserSkill, loserSkill.GetCoinCount(), winner, true, -1);
 
-            log.AddLine("   Las monedas irrompibles de " + loser.GetName() + " pegan igual: " + std::to_string(damage) + " de daño.");
+            log.AddLine("   Las monedas irrompibles de " + loser.GetName() + " pegan igual: " + std::to_string(result.damage) + " de daño" + DescribeCriticals(result.criticalHits) + ".");
         }
     }
 
@@ -270,55 +390,16 @@ namespace ReyesCuadra
         return evadeSkill.GetType() == SkillType::Evade && otherSkill.DealsDamageOnWin();
     }
 
-    static int RollEvadePower(const Skill& evadeSkill)
+    static bool SimulateFullEvade(const Skill& evadeSkill, int evadeBonus, const Skill& attackSkill, int attackBonus)
     {
-        return RollClashPower(evadeSkill, evadeSkill.GetCoinCount());
-    }
-
-    static int PerformAttackAgainstEvade(const Skill& attackSkill, int evadePower, Unit& target, int& evadedHits)
-    {
-        int power = attackSkill.GetBasePower();
-        int totalDamage = 0;
-
-        evadedHits = 0;
-
-        for (const Coin& coin : attackSkill.GetCoins())
-        {
-            if (target.IsDead())
-            {
-                break;
-            }
-
-            if (coin.Flip())
-            {
-                power += coin.GetPower();
-            }
-
-            // Para pegar hay que superar el numero de la esquiva (si empata, se esquiva)
-            if (power > evadePower)
-            {
-                target.TakeDamage(power);
-                totalDamage += power;
-            }
-            else
-            {
-                evadedHits++;
-            }
-        }
-
-        return totalDamage;
-    }
-
-    static bool SimulateFullEvade(const Skill& evadeSkill, const Skill& attackSkill)
-    {
-        const int evadePower = RollEvadePower(evadeSkill);
+        const int evadePower = RollClashPower(evadeSkill, evadeSkill.GetCoinCount(), evadeBonus);
         int power = attackSkill.GetBasePower();
 
         for (const Coin& coin : attackSkill.GetCoins())
         {
             if (coin.Flip())
             {
-                power += coin.GetPower();
+                power += coin.GetPower() + attackBonus;
             }
 
             if (power > evadePower)
@@ -332,16 +413,16 @@ namespace ReyesCuadra
 
     static void ResolveEvade(Unit& evader, const Skill& evadeSkill, Unit& attacker, const Skill& attackSkill, CombatLog& log)
     {
-        const int evadePower = RollEvadePower(evadeSkill);
-        int evadedHits = 0;
-        const int damage = PerformAttackAgainstEvade(attackSkill, evadePower, evader, evadedHits);
-        const int totalHits = attackSkill.GetCoinCount();
+        // La esquiva se tira una sola vez
+        const int evadeBonus = GetCoinPowerBonus(evadeSkill, evader.GetPoise().GetPotency());
+        const int evadePower = RollClashPower(evadeSkill, evadeSkill.GetCoinCount(), evadeBonus);
+        const AttackResult result = PerformAttack(attacker, attackSkill, attackSkill.GetCoinCount(), evader, false, evadePower);
 
-        std::string line = evader.GetName() + " esquiva (" + evadeSkill.GetShortName() + ") con " + std::to_string(evadePower) + ": evita " + std::to_string(evadedHits) + " de " + std::to_string(totalHits) + " golpes de " + attacker.GetName() + " (" + attackSkill.GetShortName() + ")";
+        std::string line = evader.GetName() + " esquiva (" + evadeSkill.GetShortName() + ") con " + std::to_string(evadePower) + ": evita " + std::to_string(result.evadedHits) + " de " + std::to_string(attackSkill.GetCoinCount()) + " golpes de " + attacker.GetName() + " (" + attackSkill.GetShortName() + ")";
 
-        if (damage > 0)
+        if (result.damage > 0)
         {
-            line += " y recibe " + std::to_string(damage) + " de daño.";
+            line += " y recibe " + std::to_string(result.damage) + " de daño" + DescribeCriticals(result.criticalHits) + ".";
         }
         else
         {

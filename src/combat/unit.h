@@ -5,6 +5,8 @@
 
 #include <SFML/Graphics/Color.hpp>
 
+#include "combat/poise.h"
+
 namespace ReyesCuadra
 {
     // Personaje que pelea (Yi Sang o Lei Heng): tiene nombre, vida y un color para dibujarlo
@@ -27,14 +29,19 @@ namespace ReyesCuadra
 
         bool IsDead() const;
 
-        // Vuelve a dejar la vida llena (para empezar una partida nueva)
-        void ResetHp();
+        // Estado de Poise de la unidad (chance de critico)
+        Poise& GetPoise();
+        const Poise& GetPoise() const;
+
+        // Deja la unidad como al principio: vida llena y sin Poise (para empezar una partida nueva)
+        void Reset();
 
     private:
         std::string name;
         int maxHp;
         int hp;
         sf::Color color;
+        Poise poise;
     };
 }
 

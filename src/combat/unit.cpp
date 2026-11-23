@@ -50,8 +50,19 @@ namespace ReyesCuadra
         return hp <= 0;
     }
 
-    void Unit::ResetHp()
+    Poise& Unit::GetPoise()
+    {
+        return poise;
+    }
+
+    const Poise& Unit::GetPoise() const
+    {
+        return poise;
+    }
+
+    void Unit::Reset()
     {
         hp = maxHp;
+        poise.Clear();
     }
 }

@@ -75,6 +75,74 @@ namespace ReyesCuadra
         return summary;
     }
 
+    const PoiseEffects& Skill::GetPoiseEffects() const
+    {
+        return poiseEffects;
+    }
+
+    void Skill::SetPoiseEffects(const PoiseEffects& effects)
+    {
+        poiseEffects = effects;
+    }
+
+    std::string Skill::GetPoiseSummary() const
+    {
+        std::vector<std::string> parts;
+
+        if (poiseEffects.onUsePotency > 0 || poiseEffects.onUseCount > 0)
+        {
+            std::string part = "usar";
+
+            if (poiseEffects.onUsePotency > 0)
+            {
+                part += " +" + std::to_string(poiseEffects.onUsePotency) + " pot.";
+            }
+
+            if (poiseEffects.onUseCount > 0)
+            {
+                part += " +" + std::to_string(poiseEffects.onUseCount) + " cant.";
+            }
+
+            parts.push_back(part);
+        }
+
+        if (poiseEffects.onHitPotency > 0 || poiseEffects.onHitCount > 0)
+        {
+            std::string part = "golpe";
+
+            if (poiseEffects.onHitPotency > 0)
+            {
+                part += " +" + std::to_string(poiseEffects.onHitPotency) + " pot.";
+            }
+
+            if (poiseEffects.onHitCount > 0)
+            {
+                part += " +" + std::to_string(poiseEffects.onHitCount) + " cant.";
+            }
+
+            parts.push_back(part);
+        }
+
+        if (poiseEffects.onCriticalCount > 0)
+        {
+            parts.push_back("crítico +" + std::to_string(poiseEffects.onCriticalCount) + " cant.");
+        }
+
+        if (parts.empty())
+        {
+            return "";
+        }
+
+        std::string summary = "Poise: " + parts.front();
+
+        for (size_t partIndex = 1; partIndex < parts.size(); partIndex++)
+        {
+            summary += " · " + parts[partIndex];
+        }
+
+        return summary;
+    }
+
     bool Skill::IsLocked() const
     {
         return isLocked;
