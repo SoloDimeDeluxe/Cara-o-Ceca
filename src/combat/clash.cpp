@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
 
 namespace ReyesCuadra
 {
@@ -87,11 +88,13 @@ namespace ReyesCuadra
     static void ApplyOnUseEffects(Unit& user, const Skill& skill);
 
     // Tira las primeras "coinsToFlip" monedas del lado y devuelve el poder total (base + caras * (poder + bonus))
-    static int RollClashPower(const ClashSide& side, int coinsToFlip);
+    // Si coinFaces no es nullptr, ahi se anota como cayo cada moneda (true = cara), para mostrarlo en pantalla
+    static int RollClashPower(const ClashSide& side, int coinsToFlip, std::vector<bool>* coinFaces);
 
     // Hace las rondas del clash: cada ronda tiran todas las monedas que les quedan y el que saca menos pierde una moneda.
     // Si empatan, se repite. Termina cuando a uno no le quedan monedas.
-    static ClashOutcome SimulateClash(const ClashSide& playerSide, const ClashSide& enemySide);
+    // Si timeline no es nullptr, se anota cada ronda (en el calculo de porcentajes se pasa nullptr)
+    static ClashOutcome SimulateClash(const ClashSide& playerSide, const ClashSide& enemySide, CombatTimeline* timeline);
 
     // Cuanta cordura gana quien gana un clash que duro esa cantidad de rondas
     static int GetClashWinSanity(int rounds);
@@ -197,7 +200,7 @@ namespace ReyesCuadra
             }
             else
             {
-                playerWon = SimulateClash(playerSide, enemySide).playerWon;
+                playerWon = SimulateClash(playerSide, enemySide, nullptr).playerWon;
             }
 
             if (playerWon)
@@ -379,32 +382,55 @@ namespace ReyesCuadra
         }
     }
 
-    static int RollClashPower(const ClashSide& side, int coinsToFlip)
+    static int RollClashPower(const ClashSide& side, int coinsToFlip, std::vector<bool>* coinFaces)
     {
         const std::vector<Coin>& coins = side.skill->GetCoins();
         int power = side.skill->GetBasePower() + side.basePowerBonus;
 
+        if (coinFaces != nullptr)
+        {
+            coinFaces->clear();
+        }
+
         for (int coinIndex = 0; coinIndex < coinsToFlip; coinIndex++)
         {
-            if (coins[static_cast<size_t>(coinIndex)].Flip(side.headsChance))
+            const bool isHeads = coins[static_cast<size_t>(coinIndex)].Flip(side.headsChance);
+
+            if (isHeads)
             {
                 power += coins[static_cast<size_t>(coinIndex)].GetPower() + side.coinPowerBonus;
+            }
+
+            if (coinFaces != nullptr)
+            {
+                coinFaces->push_back(isHeads);
             }
         }
 
         return power;
     }
 
-    static ClashOutcome SimulateClash(const ClashSide& playerSide, const ClashSide& enemySide)
+    static ClashOutcome SimulateClash(const ClashSide& playerSide, const ClashSide& enemySide, CombatTimeline* timeline)
     {
+        // Solo se guardan las caras/cruces cuando hay que mostrarlas
+        std::vector<bool> playerFaces;
+        std::vector<bool> enemyFaces;
+        std::vector<bool>* playerFacesOutput = (timeline != nullptr) ? &playerFaces : nullptr;
+        std::vector<bool>* enemyFacesOutput = (timeline != nullptr) ? &enemyFaces : nullptr;
+
         int playerCoins = playerSide.skill->GetCoinCount();
         int enemyCoins = enemySide.skill->GetCoinCount();
         int rounds = 0;
 
         while (playerCoins > 0 && enemyCoins > 0 && rounds < MAX_CLASH_ROUNDS)
         {
-            const int playerPower = RollClashPower(playerSide, playerCoins);
-            const int enemyPower = RollClashPower(enemySide, enemyCoins);
+            const int playerPower = RollClashPower(playerSide, playerCoins, playerFacesOutput);
+            const int enemyPower = RollClashPower(enemySide, enemyCoins, enemyFacesOutput);
+
+            if (timeline != nullptr)
+            {
+                timeline->AddClashRound(playerPower, playerFaces, playerSide.skill->GetCoinCount(), enemyPower, enemyFaces, enemySide.skill->GetCoinCount());
+            }
 
             if (playerPower > enemyPower)
             {
@@ -627,7 +653,7 @@ namespace ReyesCuadra
 
         const ClashSide playerSide = { &playerSkill, GetBasePowerBonus(playerSkill, enemy), GetCoinPowerBonus(playerSkill, player, enemy), player.GetHeadsChance() };
         const ClashSide enemySide = { &enemySkill, GetBasePowerBonus(enemySkill, player), GetCoinPowerBonus(enemySkill, enemy, player), enemy.GetHeadsChance() };
-        const ClashOutcome outcome = SimulateClash(playerSide, enemySide);
+        const ClashOutcome outcome = SimulateClash(playerSide, enemySide, &timeline);
 
         Unit& winner = outcome.playerWon ? player : enemy;
         Unit& loser = outcome.playerWon ? enemy : player;
@@ -672,7 +698,7 @@ namespace ReyesCuadra
 
     static bool SimulateFullEvade(const ClashSide& evadeSide, const ClashSide& attackSide)
     {
-        const int evadePower = RollClashPower(evadeSide, evadeSide.skill->GetCoinCount());
+        const int evadePower = RollClashPower(evadeSide, evadeSide.skill->GetCoinCount(), nullptr);
         int power = attackSide.skill->GetBasePower() + attackSide.basePowerBonus;
 
         for (const Coin& coin : attackSide.skill->GetCoins())
@@ -695,7 +721,10 @@ namespace ReyesCuadra
     {
         // La esquiva se tira una sola vez
         const ClashSide evadeSide = { &evadeSkill, GetBasePowerBonus(evadeSkill, attacker), GetCoinPowerBonus(evadeSkill, evader, attacker), evader.GetHeadsChance() };
-        const int evadePower = RollClashPower(evadeSide, evadeSkill.GetCoinCount());
+        std::vector<bool> evadeFaces;
+        const int evadePower = RollClashPower(evadeSide, evadeSkill.GetCoinCount(), &evadeFaces);
+
+        timeline.AddEvadeRoll(evadePower, evadeFaces, evadeSkill.GetCoinCount());
         const AttackResult result = PerformAttack(attacker, attackSkill, attackSkill.GetCoinCount(), evader, false, evadePower, timeline);
 
         std::string line = evader.GetName() + " esquiva (" + evadeSkill.GetShortName() + ") con " + std::to_string(evadePower) + ": evita " + std::to_string(result.evadedHits) + " de " + std::to_string(attackSkill.GetCoinCount()) + " golpes de " + attacker.GetName() + " (" + attackSkill.GetShortName() + ")";

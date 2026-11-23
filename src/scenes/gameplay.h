@@ -46,6 +46,14 @@ namespace ReyesCuadra
         float timeLeft;
     };
 
+    // Chance ya calculada de una skill de Yi Sang contra una de Lei Heng (para no simular lo mismo dos veces en el turno)
+    struct WinChanceCacheEntry
+    {
+        const Skill* playerSkill;
+        const Skill* enemySkill;
+        float winChance;
+    };
+
     // Escena del combate: Yi Sang contra Lei Heng, por turnos
     class Gameplay
     {
@@ -97,6 +105,10 @@ namespace ReyesCuadra
 
         // Recalcula el porcentaje de victoria de cada columna (se llama cada vez que cambia alguna skill)
         void UpdateWinChances();
+
+        // Devuelve la chance de ganar el clash. La primera vez la simula y despues la saca de la lista guardada,
+        // asi los clics no se traban (mientras se eligen skills, nadie cambia de estado y la chance es la misma)
+        float GetWinChance(const Skill& playerSkill, const Skill& enemySkill);
 
         // Pone al lado de cada boton de skill la chance que tendria esa skill contra la de Lei Heng del slot seleccionado,
         // asi el jugador compara antes de elegir (como en Limbus)
@@ -154,6 +166,16 @@ namespace ReyesCuadra
         void DrawFloatingTexts(sf::RenderWindow& window) const;
         void DrawBanner(sf::RenderWindow& window) const;
 
+        // Monedas del clash que se esta mostrando, abajo de cada tarjeta de la columna activa
+        void DrawClashCoins(sf::RenderWindow& window) const;
+
+        // Fila de monedas de un lado: giran un ratito y despues muestran cara (dorada) o cruz (gris).
+        // Las que ya se rompieron se ven vacias; si breaksLastCoin es true, la ultima tirada se marca en rojo (se rompe).
+        void DrawCoinRow(sf::RenderWindow& window, sf::FloatRect cardBounds, const std::vector<bool>& coinFaces, int totalCoins, bool breaksLastCoin) const;
+
+        // Poder de cada uno en la ronda del clash (o el numero de la esquiva), entre las dos filas
+        void DrawClashNumbers(sf::RenderWindow& window, sf::FloatRect area) const;
+
         const sf::Font& font;
 
         Unit player;
@@ -188,6 +210,9 @@ namespace ReyesCuadra
 
         // Chance de ganar el clash de cada columna (0 a 1). Un valor negativo significa que en esa columna no hay clash.
         std::array<float, SLOT_COUNT> winChances;
+
+        // Chances ya calculadas este turno (se vacia en cada PrepareTurn)
+        std::vector<WinChanceCacheEntry> winChanceCache;
 
         // true en las columnas sin accion de Yi Sang que cubriria una esquiva activa de una columna anterior
         std::array<bool, SLOT_COUNT> columnCoveredByEvade;
@@ -232,6 +257,13 @@ namespace ReyesCuadra
 
         std::string bannerText;
         float bannerTimeLeft;
+
+        // Ronda de clash (o tirada de esquiva) que se esta mostrando en la columna activa
+        CombatEvent shownClash;
+        bool isShowingClash;
+
+        // Tiempo que les queda girando a las monedas antes de mostrar como cayeron
+        float coinSpinTimeLeft;
 
         // Tarjeta que se sacude cuando recibe un golpe
         int shakeColumn;

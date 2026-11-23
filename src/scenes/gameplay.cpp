@@ -113,6 +113,22 @@ namespace ReyesCuadra
     static const float HIT_DURATION = 0.32f;
     static const float BANNER_DURATION = 0.9f;
     static const float LOG_LINE_DURATION = 0.2f;
+    static const float CLASH_ROUND_DURATION = 0.65f;
+    static const float EVADE_ROLL_DURATION = 0.6f;
+
+    // Monedas del clash: cuanto tiempo giran, que tan rapido y como se dibujan
+    static const float COIN_SPIN_DURATION = 0.3f;
+    static const float COIN_SPIN_SPEED = 40.0f;
+    static const float COIN_RADIUS = 7.0f;
+    static const float COIN_GAP = 4.0f;
+    static const float COIN_STRIP_HEIGHT = 22.0f;
+    static const float COIN_OUTLINE_THICKNESS = 2.0f;
+    static const sf::Color COIN_STRIP_COLOR = sf::Color(0, 0, 0, 170);
+    static const sf::Color COIN_HEADS_COLOR = sf::Color(230, 195, 90);
+    static const sf::Color COIN_TAILS_COLOR = sf::Color(95, 90, 100);
+    static const sf::Color COIN_BROKEN_COLOR = sf::Color(30, 28, 32);
+    static const sf::Color COIN_OUTLINE_COLOR = sf::Color(60, 50, 40);
+    static const sf::Color COIN_BREAKING_COLOR = sf::Color(230, 70, 60);
 
     // Animaciones
     static const float FLOATING_TEXT_DURATION = 0.9f;
@@ -248,6 +264,9 @@ namespace ReyesCuadra
         , targetEnemyHp(static_cast<float>(ENEMY_MAX_HP))
         , bannerText("")
         , bannerTimeLeft(0.0f)
+        , shownClash()
+        , isShowingClash(false)
+        , coinSpinTimeLeft(0.0f)
         , shakeColumn(NO_COLUMN)
         , shakeIsPlayerRow(false)
         , shakeTimeLeft(0.0f)
@@ -467,6 +486,11 @@ namespace ReyesCuadra
         {
             shakeTimeLeft -= deltaSeconds;
         }
+
+        if (coinSpinTimeLeft > 0.0f)
+        {
+            coinSpinTimeLeft -= deltaSeconds;
+        }
     }
 
     void Gameplay::Draw(sf::RenderWindow& window) const
@@ -474,6 +498,7 @@ namespace ReyesCuadra
         DrawUnitPanels(window);
         DrawActiveColumn(window);
         DrawSlots(window);
+        DrawClashCoins(window);
         DrawFloatingTexts(window);
         DrawSkillButtons(window);
         fightButton.Draw(window, mousePosition);
@@ -548,6 +573,9 @@ namespace ReyesCuadra
         }
 
         selectedSlot = 0;
+
+        // Cambio el estado de las unidades (vida, Poise, SP...): las chances viejas ya no sirven
+        winChanceCache.clear();
 
         RebuildPlayerActions();
         RefreshHandButtons();
@@ -701,11 +729,27 @@ namespace ReyesCuadra
             // Solo hay clash si estan las dos skills y al menos una de las dos ataca
             const bool hasClash = playerSkill != nullptr && enemySkill != nullptr && !(playerSkill->IsDefensive() && enemySkill->IsDefensive());
 
-            winChances[static_cast<size_t>(slotIndex)] = hasClash ? EstimateClashWinChance(player, *playerSkill, enemy, *enemySkill) : -1.0f;
+            winChances[static_cast<size_t>(slotIndex)] = hasClash ? GetWinChance(*playerSkill, *enemySkill) : -1.0f;
         }
 
         // Si cambiaron las skills o el slot seleccionado, tambien cambian los numeros de los botones
         UpdateSkillButtonChances();
+    }
+
+    float Gameplay::GetWinChance(const Skill& playerSkill, const Skill& enemySkill)
+    {
+        for (const WinChanceCacheEntry& entry : winChanceCache)
+        {
+            if (entry.playerSkill == &playerSkill && entry.enemySkill == &enemySkill)
+            {
+                return entry.winChance;
+            }
+        }
+
+        const float winChance = EstimateClashWinChance(player, playerSkill, enemy, enemySkill);
+        winChanceCache.push_back({ &playerSkill, &enemySkill, winChance });
+
+        return winChance;
     }
 
     void Gameplay::UpdateSkillButtonChances()
@@ -733,7 +777,7 @@ namespace ReyesCuadra
                 }
                 else
                 {
-                    const float winChance = EstimateClashWinChance(player, playerSkill, enemy, *enemySkill);
+                    const float winChance = GetWinChance(playerSkill, *enemySkill);
 
                     button.SetRightText(FormatPercent(winChance), GetChanceColor(winChance));
                 }
@@ -873,6 +917,7 @@ namespace ReyesCuadra
             case CombatEventType::ColumnStart:
             {
                 activeColumn = event.column;
+                isShowingClash = false;
                 eventTimer += COLUMN_START_DURATION;
                 break;
             }
@@ -891,6 +936,23 @@ namespace ReyesCuadra
                 shakeTimeLeft = SHAKE_DURATION;
 
                 eventTimer += HIT_DURATION;
+                break;
+            }
+            case CombatEventType::ClashRound:
+            {
+                // Las monedas giran un ratito y despues se ve como cayeron y quien gano la ronda
+                shownClash = event;
+                isShowingClash = true;
+                coinSpinTimeLeft = COIN_SPIN_DURATION;
+                eventTimer += CLASH_ROUND_DURATION;
+                break;
+            }
+            case CombatEventType::EvadeRoll:
+            {
+                shownClash = event;
+                isShowingClash = true;
+                coinSpinTimeLeft = COIN_SPIN_DURATION;
+                eventTimer += EVADE_ROLL_DURATION;
                 break;
             }
             case CombatEventType::Banner:
@@ -924,6 +986,7 @@ namespace ReyesCuadra
 
         nextEventIndex = events.size();
         activeColumn = NO_COLUMN;
+        isShowingClash = false;
         targetPlayerHp = static_cast<float>(player.GetHp());
         targetEnemyHp = static_cast<float>(enemy.GetHp());
         fightButton.SetLabel("¡Combatir!");
@@ -1136,7 +1199,16 @@ namespace ReyesCuadra
             DrawSlotCard(window, enemyBounds, enemySkill, ENEMY_SLOT_COLOR, false, enemy.IsStaggered() ? "Staggereado" : "Sin acción");
 
             const sf::FloatRect previewArea({ enemyBounds.position.x, VS_ROW_Y }, { SLOT_WIDTH, VS_ROW_HEIGHT });
-            DrawClashPreview(window, slotIndex, previewArea);
+
+            // En la columna que se esta peleando se ve el poder de cada uno; en las demas, la chance
+            if (isShowingClash && slotIndex == activeColumn)
+            {
+                DrawClashNumbers(window, previewArea);
+            }
+            else
+            {
+                DrawClashPreview(window, slotIndex, previewArea);
+            }
 
             // Fila de abajo: lo que eligio el jugador para Yi Sang
             sf::FloatRect playerBounds = GetSlotBounds(slotIndex, true);
@@ -1388,6 +1460,119 @@ namespace ReyesCuadra
         const bool isStagger = bannerText.find("STAGGER") != std::string::npos;
 
         DrawTextCentered(window, font, bannerText, BANNER_TEXT_SIZE, area, isStagger ? STAGGER_COLOR : GOLD_COLOR);
+    }
+
+    void Gameplay::DrawClashCoins(sf::RenderWindow& window) const
+    {
+        if (!isShowingClash || activeColumn == NO_COLUMN)
+        {
+            return;
+        }
+
+        const bool isRevealed = coinSpinTimeLeft <= 0.0f;
+        const bool isEvade = shownClash.type == CombatEventType::EvadeRoll;
+
+        // Despues de girar se sabe quien perdio la ronda: a ese se le rompe la ultima moneda
+        const bool playerLosesRound = isRevealed && !isEvade && shownClash.enemyPower > shownClash.playerPower;
+        const bool enemyLosesRound = isRevealed && !isEvade && shownClash.playerPower > shownClash.enemyPower;
+
+        DrawCoinRow(window, GetSlotBounds(activeColumn, true), shownClash.playerCoinFaces, shownClash.playerTotalCoins, playerLosesRound);
+
+        if (!isEvade)
+        {
+            DrawCoinRow(window, GetSlotBounds(activeColumn, false), shownClash.enemyCoinFaces, shownClash.enemyTotalCoins, enemyLosesRound);
+        }
+    }
+
+    void Gameplay::DrawCoinRow(sf::RenderWindow& window, sf::FloatRect cardBounds, const std::vector<bool>& coinFaces, int totalCoins, bool breaksLastCoin) const
+    {
+        // Franja oscura abajo de la tarjeta para que las monedas se vean bien encima del texto
+        const float stripY = cardBounds.position.y + cardBounds.size.y - COIN_STRIP_HEIGHT;
+        sf::RectangleShape strip({ cardBounds.size.x, COIN_STRIP_HEIGHT });
+        strip.setPosition({ cardBounds.position.x, stripY });
+        strip.setFillColor(COIN_STRIP_COLOR);
+        window.draw(strip);
+
+        const bool isSpinning = coinSpinTimeLeft > 0.0f;
+        const float centerY = stripY + COIN_STRIP_HEIGHT / 2.0f;
+        const int flippedCoins = static_cast<int>(coinFaces.size());
+
+        for (int coinIndex = 0; coinIndex < totalCoins; coinIndex++)
+        {
+            const float centerX = cardBounds.position.x + SLOT_TEXT_PADDING + COIN_RADIUS + static_cast<float>(coinIndex) * (COIN_RADIUS * 2.0f + COIN_GAP);
+
+            sf::CircleShape coin(COIN_RADIUS);
+            coin.setOrigin({ COIN_RADIUS, COIN_RADIUS });
+            coin.setPosition({ centerX, centerY });
+            coin.setOutlineThickness(COIN_OUTLINE_THICKNESS);
+            coin.setOutlineColor(COIN_OUTLINE_COLOR);
+
+            if (coinIndex >= flippedCoins)
+            {
+                // Moneda que ya se rompio en una ronda anterior
+                coin.setFillColor(COIN_BROKEN_COLOR);
+            }
+            else if (isSpinning)
+            {
+                // Mientras gira se achica de costado y cambia de cara (como una moneda en el aire)
+                const float spin = std::cos(coinSpinTimeLeft * COIN_SPIN_SPEED + static_cast<float>(coinIndex));
+                coin.setScale({ std::fabs(spin), 1.0f });
+                coin.setFillColor(spin > 0.0f ? COIN_HEADS_COLOR : COIN_TAILS_COLOR);
+            }
+            else
+            {
+                const bool isHeads = coinFaces[static_cast<size_t>(coinIndex)];
+                coin.setFillColor(isHeads ? COIN_HEADS_COLOR : COIN_TAILS_COLOR);
+
+                // La ultima moneda del que perdio la ronda es la que se rompe
+                if (breaksLastCoin && coinIndex == flippedCoins - 1)
+                {
+                    coin.setOutlineColor(COIN_BREAKING_COLOR);
+                }
+            }
+
+            window.draw(coin);
+        }
+    }
+
+    void Gameplay::DrawClashNumbers(sf::RenderWindow& window, sf::FloatRect area) const
+    {
+        // Mientras giran las monedas todavia no se sabe el resultado
+        if (coinSpinTimeLeft > 0.0f)
+        {
+            DrawTextCentered(window, font, "...", VS_SIZE, area, DIM_TEXT_COLOR);
+            return;
+        }
+
+        if (shownClash.type == CombatEventType::EvadeRoll)
+        {
+            DrawTextCentered(window, font, "Esquiva: " + std::to_string(shownClash.playerPower), VS_SIZE, area, GOLD_COLOR);
+            return;
+        }
+
+        // Gana la ronda el que saco mas poder: en dorado; el que perdio, en rojo; si empatan, los dos apagados
+        sf::Color playerColor = DIM_TEXT_COLOR;
+        sf::Color enemyColor = DIM_TEXT_COLOR;
+
+        if (shownClash.playerPower > shownClash.enemyPower)
+        {
+            playerColor = GOLD_COLOR;
+            enemyColor = UNFAVORABLE_COLOR;
+        }
+        else if (shownClash.enemyPower > shownClash.playerPower)
+        {
+            playerColor = UNFAVORABLE_COLOR;
+            enemyColor = GOLD_COLOR;
+        }
+
+        const float thirdWidth = area.size.x / 3.0f;
+        const sf::FloatRect playerArea(area.position, { thirdWidth, area.size.y });
+        const sf::FloatRect middleArea({ area.position.x + thirdWidth, area.position.y }, { thirdWidth, area.size.y });
+        const sf::FloatRect enemyArea({ area.position.x + thirdWidth * 2.0f, area.position.y }, { thirdWidth, area.size.y });
+
+        DrawTextCentered(window, font, "YS " + std::to_string(shownClash.playerPower), VS_SIZE, playerArea, playerColor);
+        DrawTextCentered(window, font, (shownClash.playerPower == shownClash.enemyPower) ? "empate" : "vs", VS_SIZE, middleArea, DIM_TEXT_COLOR);
+        DrawTextCentered(window, font, std::to_string(shownClash.enemyPower) + " LH", VS_SIZE, enemyArea, enemyColor);
     }
 
     void Gameplay::DrawGameOver(sf::RenderWindow& window) const

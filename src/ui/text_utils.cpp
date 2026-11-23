@@ -1,5 +1,6 @@
 #include "ui/text_utils.h"
 
+#include <map>
 #include <sstream>
 
 namespace ReyesCuadra
@@ -12,8 +13,27 @@ namespace ReyesCuadra
         return sf::String::fromUtf8(utf8Text.begin(), utf8Text.end());
     }
 
+    // Tope de textos guardados: el registro de combate agrega lineas nuevas todo el tiempo,
+    // asi que si se llena se vacia y se vuelve a armar con lo que se este dibujando
+    static const size_t MAX_CACHED_TEXTS = 500;
+
+    // Arma la clave con la que se guarda un texto ya cortado en renglones (texto, fuente, tamano y ancho)
+    static std::string MakeWrapKey(const sf::Font& font, const std::string& utf8Text, unsigned int characterSize, float maxWidth);
+
     std::vector<std::string> WrapText(const sf::Font& font, const std::string& utf8Text, unsigned int characterSize, float maxWidth)
     {
+        // Medir el texto palabra por palabra es lento, y muchos textos se dibujan en todos los frames
+        // (tarjetas, detalle de la skill, ayuda). Cada texto se corta una sola vez y despues se usa lo guardado.
+        static std::map<std::string, std::vector<std::string>> wrappedTextCache;
+
+        const std::string cacheKey = MakeWrapKey(font, utf8Text, characterSize, maxWidth);
+        const std::map<std::string, std::vector<std::string>>::const_iterator cached = wrappedTextCache.find(cacheKey);
+
+        if (cached != wrappedTextCache.end())
+        {
+            return cached->second;
+        }
+
         std::vector<std::string> lines;
         std::istringstream wordStream(utf8Text);
         std::string word;
@@ -39,6 +59,13 @@ namespace ReyesCuadra
         {
             lines.push_back(currentLine);
         }
+
+        if (wrappedTextCache.size() >= MAX_CACHED_TEXTS)
+        {
+            wrappedTextCache.clear();
+        }
+
+        wrappedTextCache[cacheKey] = lines;
 
         return lines;
     }
@@ -77,6 +104,14 @@ namespace ReyesCuadra
         text.setPosition({ rightTopPosition.x - bounds.position.x - bounds.size.x, rightTopPosition.y });
 
         window.draw(text);
+    }
+
+    static std::string MakeWrapKey(const sf::Font& font, const std::string& utf8Text, unsigned int characterSize, float maxWidth)
+    {
+        std::ostringstream key;
+        key << static_cast<const void*>(&font) << '|' << characterSize << '|' << maxWidth << '|' << utf8Text;
+
+        return key.str();
     }
 
     static float MeasureTextWidth(const sf::Font& font, const std::string& utf8Text, unsigned int characterSize)

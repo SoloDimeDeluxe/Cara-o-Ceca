@@ -13,6 +13,8 @@ namespace ReyesCuadra
     {
         ColumnStart,    // empieza a resolverse una columna
         Hit,            // un golpe que hace dano a la vida
+        ClashRound,     // una ronda del clash: como cayo cada moneda y cuanto poder saco cada uno
+        EvadeRoll,      // la tirada de la esquiva de Yi Sang (el numero que hay que superar para pegarle)
         Banner,         // cartel grande en el medio (Stagger, Tremor Burst)
         LogLine         // linea de texto para el registro de combate
     };
@@ -30,6 +32,16 @@ namespace ReyesCuadra
         bool targetIsPlayer = false;
         int damage = 0;
         bool isCritical = false;
+
+        // Para las rondas de clash: poder de cada uno y como cayo cada moneda tirada (true = cara).
+        // Las monedas que no estan en la lista ya se rompieron en rondas anteriores.
+        // En la tirada de esquiva solo se usan playerPower y playerCoinFaces.
+        int playerPower = 0;
+        int enemyPower = 0;
+        std::vector<bool> playerCoinFaces;
+        std::vector<bool> enemyCoinFaces;
+        int playerTotalCoins = 0;
+        int enemyTotalCoins = 0;
 
         // Texto del cartel o de la linea del registro
         std::string text;
@@ -51,6 +63,12 @@ namespace ReyesCuadra
         void EndColumn();
 
         void AddHit(const Unit& target, int damage, bool isCritical);
+
+        // Anota una ronda del clash con el poder de cada lado y las caras/cruces de sus monedas
+        void AddClashRound(int playerPower, const std::vector<bool>& playerCoinFaces, int playerTotalCoins, int enemyPower, const std::vector<bool>& enemyCoinFaces, int enemyTotalCoins);
+
+        // Anota la tirada de la esquiva (el que esquiva es siempre Yi Sang)
+        void AddEvadeRoll(int evadePower, const std::vector<bool>& coinFaces, int totalCoins);
         void AddBanner(const std::string& text);
         void AddLogLine(const std::string& text);
 
