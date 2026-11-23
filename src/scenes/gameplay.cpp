@@ -69,6 +69,20 @@ namespace ReyesCuadra
     static const sf::Vector2f RESTART_BUTTON_SIZE = { 260.0f, 54.0f };
     static const float RESTART_BUTTON_OFFSET_Y = 60.0f;
 
+    // Cartel de "Como se juega" y el boton que lo abre
+    static const sf::Vector2f HELP_BOX_SIZE = { 820.0f, 480.0f };
+    static const float HELP_PADDING = 30.0f;
+    static const float HELP_TITLE_HEIGHT = 56.0f;
+    static const float HELP_LINE_HEIGHT = 25.0f;
+    static const float HELP_RULE_GAP = 8.0f;
+    static const sf::Vector2f CLOSE_HELP_BUTTON_SIZE = { 220.0f, 48.0f };
+    static const sf::FloatRect HELP_BUTTON_BOUNDS = sf::FloatRect({ 1100.0f, 330.0f }, { 150.0f, 28.0f });
+
+    // A partir de que porcentaje un clash se considera favorable o desfavorable
+    static const float FAVORABLE_CHANCE = 0.6f;
+    static const float UNFAVORABLE_CHANCE = 0.4f;
+    static const float PERCENT_MULTIPLIER = 100.0f;
+
     // ---------- Tamanos de texto ----------
 
     static const unsigned int NAME_SIZE = 26;
@@ -79,6 +93,8 @@ namespace ReyesCuadra
     static const unsigned int VS_SIZE = 18;
     static const unsigned int HINT_SIZE = 15;
     static const unsigned int GAME_OVER_TITLE_SIZE = 48;
+    static const unsigned int HELP_TITLE_SIZE = 34;
+    static const unsigned int HELP_RULE_SIZE = 18;
 
     // ---------- Colores ----------
 
@@ -93,11 +109,24 @@ namespace ReyesCuadra
     static const sf::Color SLOT_BORDER_COLOR = sf::Color(90, 80, 70);
     static const sf::Color OVERLAY_COLOR = sf::Color(0, 0, 0, 170);
     static const sf::Color GAME_OVER_BOX_COLOR = sf::Color(30, 27, 33);
+    static const sf::Color FAVORABLE_COLOR = sf::Color(120, 200, 120);
+    static const sf::Color EVEN_COLOR = sf::Color(225, 195, 95);
+    static const sf::Color UNFAVORABLE_COLOR = sf::Color(215, 95, 85);
     static const float SLOT_BORDER_THICKNESS = 2.0f;
     static const float SELECTED_BORDER_THICKNESS = 4.0f;
 
     // Etiqueta corta que va delante del nombre de cada skill en los botones (mismo orden que PlayerSkillIndex)
     static const char* PLAYER_SKILL_TAGS[] = { "S1", "S2", "S3", "Defensa", "S3-2" };
+
+    // Reglas que se muestran en el cartel de "Como se juega", una por parrafo
+    static const char* HELP_RULES[] =
+    {
+        "1. Cada turno elegís una skill para cada uno de los 6 slots de Yi Sang (fila de abajo).",
+        "2. Cada slot choca contra la skill de Lei Heng que tiene justo arriba. Eso es un clash.",
+        "3. En el clash los dos tiran sus monedas: cada cara suma poder. El que suma más le rompe una moneda al otro, y se repite hasta que uno se queda sin monedas.",
+        "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes.",
+        "5. Esquivar no hace daño, pero si gana te salva del golpe. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda el clash."
+    };
 
     // Dibuja el cuadrado de color, el nombre y la barra de vida de una unidad. Si isRightSide es true, se dibuja espejado a la derecha.
     static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide);
@@ -114,10 +143,14 @@ namespace ReyesCuadra
         , tiantuiReload("Recargando espada tiantui", "Recargando espada tiantui", SkillType::Counter, 4, 2, 4, false)
         , enemyPattern(doubleSlash, tripleSlash, explosiveSlash, tangleCutter, tigerslayerFlurry)
         , playerActions()
+        , winChances()
         , fightButton(gameFont, sf::FloatRect({ MARGIN, FIGHT_BUTTON_Y }, { SKILL_BUTTON_WIDTH, FIGHT_BUTTON_HEIGHT }), "¡Combatir!", "")
         , restartButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - RESTART_BUTTON_SIZE.x) / 2.0f, SCREEN_HEIGHT / 2.0f + RESTART_BUTTON_OFFSET_Y - RESTART_BUTTON_SIZE.y / 2.0f }, RESTART_BUTTON_SIZE), "Jugar de nuevo", "")
+        , helpButton(gameFont, HELP_BUTTON_BOUNDS, "¿Cómo se juega?", "")
+        , closeHelpButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - CLOSE_HELP_BUTTON_SIZE.x) / 2.0f, (SCREEN_HEIGHT + HELP_BOX_SIZE.y) / 2.0f - HELP_PADDING - CLOSE_HELP_BUTTON_SIZE.y }, CLOSE_HELP_BUTTON_SIZE), "¡Entendido!", "")
         , combatLog(gameFont, COMBAT_LOG_AREA)
         , state(GameState::ChoosingSkills)
+        , isShowingHelp(true)
         , turn(1)
         , selectedSlot(0)
         , mousePosition({ 0.0f, 0.0f })
@@ -171,9 +204,17 @@ namespace ReyesCuadra
         fightButton.Draw(window, mousePosition);
         combatLog.Draw(window);
 
+        helpButton.Draw(window, mousePosition);
+
         if (state != GameState::ChoosingSkills)
         {
             DrawGameOver(window);
+        }
+
+        // La ayuda va arriba de todo
+        if (isShowingHelp)
+        {
+            DrawHelp(window);
         }
     }
 
@@ -197,6 +238,22 @@ namespace ReyesCuadra
         // Para no tener que elegir los 6 slots cada turno, arrancan todos con S1
         playerActions.fill(&playerSkills[SKILL_1]);
         selectedSlot = 0;
+
+        UpdateWinChances();
+    }
+
+    void Gameplay::UpdateWinChances()
+    {
+        for (int slotIndex = 0; slotIndex < SLOT_COUNT; slotIndex++)
+        {
+            const Skill* playerSkill = playerActions[static_cast<size_t>(slotIndex)];
+            const Skill* enemySkill = (slotIndex < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(slotIndex)] : nullptr;
+
+            // Solo hay clash si estan las dos skills y al menos una de las dos ataca
+            const bool hasClash = playerSkill != nullptr && enemySkill != nullptr && !(playerSkill->IsDefensive() && enemySkill->IsDefensive());
+
+            winChances[static_cast<size_t>(slotIndex)] = hasClash ? EstimateClashWinChance(*playerSkill, *enemySkill) : -1.0f;
+        }
     }
 
     void Gameplay::ResolveTurn()
@@ -236,6 +293,13 @@ namespace ReyesCuadra
 
     void Gameplay::HandleClick(sf::Vector2f clickPosition)
     {
+        // Con la ayuda abierta, cualquier clic la cierra
+        if (isShowingHelp)
+        {
+            isShowingHelp = false;
+            return;
+        }
+
         // Con la partida terminada, lo unico que responde es el boton de jugar de nuevo
         if (state != GameState::ChoosingSkills)
         {
@@ -264,6 +328,7 @@ namespace ReyesCuadra
             {
                 playerActions[static_cast<size_t>(selectedSlot)] = &playerSkills[buttonIndex];
                 selectedSlot = (selectedSlot + 1) % SLOT_COUNT;
+                UpdateWinChances();
                 return;
             }
         }
@@ -271,6 +336,10 @@ namespace ReyesCuadra
         if (fightButton.Contains(clickPosition))
         {
             ResolveTurn();
+        }
+        else if (helpButton.Contains(clickPosition))
+        {
+            isShowingHelp = true;
         }
     }
 
@@ -302,8 +371,8 @@ namespace ReyesCuadra
 
             DrawSlotCard(window, enemyBounds, enemySkill, ENEMY_SLOT_COLOR, false);
 
-            const sf::FloatRect vsArea({ enemyBounds.position.x, VS_ROW_Y }, { SLOT_WIDTH, VS_ROW_HEIGHT });
-            DrawTextCentered(window, font, "VS", VS_SIZE, vsArea, DIM_TEXT_COLOR);
+            const sf::FloatRect previewArea({ enemyBounds.position.x, VS_ROW_Y }, { SLOT_WIDTH, VS_ROW_HEIGHT });
+            DrawClashPreview(window, slotIndex, previewArea);
 
             // Fila de abajo: lo que eligio el jugador para Yi Sang
             const sf::FloatRect playerBounds = GetSlotBounds(slotIndex, true);
@@ -312,7 +381,7 @@ namespace ReyesCuadra
             DrawSlotCard(window, playerBounds, playerActions[static_cast<size_t>(slotIndex)], PLAYER_SLOT_COLOR, isHighlighted);
         }
 
-        DrawTextAt(window, font, "Hacé clic en un slot de Yi Sang y después en una skill de la lista para asignársela.", HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
+        DrawTextAt(window, font, "Clic en un slot de Yi Sang y después en una skill. El % entre las filas es tu chance de ganar ese clash.", HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
     }
 
     void Gameplay::DrawSlotCard(sf::RenderWindow& window, sf::FloatRect bounds, const Skill* skill, sf::Color fillColor, bool isHighlighted) const
@@ -347,6 +416,45 @@ namespace ReyesCuadra
         }
     }
 
+    void Gameplay::DrawClashPreview(sf::RenderWindow& window, int slotIndex, sf::FloatRect area) const
+    {
+        const Skill* playerSkill = playerActions[static_cast<size_t>(slotIndex)];
+        const Skill* enemySkill = (slotIndex < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(slotIndex)] : nullptr;
+        const float winChance = winChances[static_cast<size_t>(slotIndex)];
+
+        // Casos sin clash: no hay rival, o son dos defensas enfrentadas
+        if (winChance < 0.0f)
+        {
+            std::string label = "No chocan";
+
+            if (enemySkill == nullptr && playerSkill != nullptr)
+            {
+                label = playerSkill->IsDefensive() ? "Sin rival" : "Sin rival: pegás directo";
+            }
+
+            DrawTextCentered(window, font, label, VS_SIZE, area, DIM_TEXT_COLOR);
+            return;
+        }
+
+        sf::Color color = EVEN_COLOR;
+        std::string verdict = "Parejo";
+
+        if (winChance >= FAVORABLE_CHANCE)
+        {
+            color = FAVORABLE_COLOR;
+            verdict = "Favorable";
+        }
+        else if (winChance < UNFAVORABLE_CHANCE)
+        {
+            color = UNFAVORABLE_COLOR;
+            verdict = "Desfavorable";
+        }
+
+        const int percent = static_cast<int>(winChance * PERCENT_MULTIPLIER + 0.5f);
+
+        DrawTextCentered(window, font, std::to_string(percent) + "% · " + verdict, VS_SIZE, area, color);
+    }
+
     void Gameplay::DrawSkillButtons(sf::RenderWindow& window) const
     {
         for (const Button& button : skillButtons)
@@ -376,6 +484,41 @@ namespace ReyesCuadra
 
         DrawTextCentered(window, font, title, GAME_OVER_TITLE_SIZE, titleArea, GOLD_COLOR);
         restartButton.Draw(window, mousePosition);
+    }
+
+    void Gameplay::DrawHelp(sf::RenderWindow& window) const
+    {
+        sf::RectangleShape overlay({ SCREEN_WIDTH, SCREEN_HEIGHT });
+        overlay.setFillColor(OVERLAY_COLOR);
+        window.draw(overlay);
+
+        const sf::Vector2f boxPosition = { (SCREEN_WIDTH - HELP_BOX_SIZE.x) / 2.0f, (SCREEN_HEIGHT - HELP_BOX_SIZE.y) / 2.0f };
+
+        sf::RectangleShape box(HELP_BOX_SIZE);
+        box.setPosition(boxPosition);
+        box.setFillColor(GAME_OVER_BOX_COLOR);
+        box.setOutlineColor(GOLD_COLOR);
+        box.setOutlineThickness(SLOT_BORDER_THICKNESS);
+        window.draw(box);
+
+        DrawTextCentered(window, font, "Cómo se juega", HELP_TITLE_SIZE, sf::FloatRect(boxPosition, { HELP_BOX_SIZE.x, HELP_TITLE_HEIGHT }), GOLD_COLOR);
+
+        // Cada regla se corta en varias lineas para que entre en el ancho del cartel
+        const float textWidth = HELP_BOX_SIZE.x - HELP_PADDING * 2.0f;
+        float lineY = boxPosition.y + HELP_TITLE_HEIGHT + HELP_RULE_GAP;
+
+        for (const char* rule : HELP_RULES)
+        {
+            for (const std::string& line : WrapText(font, rule, HELP_RULE_SIZE, textWidth))
+            {
+                DrawTextAt(window, font, line, HELP_RULE_SIZE, { boxPosition.x + HELP_PADDING, lineY }, TEXT_COLOR);
+                lineY += HELP_LINE_HEIGHT;
+            }
+
+            lineY += HELP_RULE_GAP;
+        }
+
+        closeHelpButton.Draw(window, mousePosition);
     }
 
     static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide)

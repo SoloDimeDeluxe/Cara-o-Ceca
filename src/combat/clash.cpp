@@ -7,8 +7,23 @@ namespace ReyesCuadra
     // Tope de rondas de un clash, para que nunca quede trabado si empatan muchas veces seguidas
     static const int MAX_CLASH_ROUNDS = 99;
 
+    // Cantidad de clashes de prueba que se simulan para calcular el porcentaje de victoria
+    static const int WIN_CHANCE_SIMULATIONS = 1000;
+
+    // Resultado de tirar las monedas de un clash (sin aplicar el dano)
+    struct ClashOutcome
+    {
+        bool playerWon;
+        int winnerCoinsLeft;
+        int rounds;
+    };
+
     // Tira las primeras "coinsToFlip" monedas de la skill y devuelve el poder total (base + caras)
     static int RollClashPower(const Skill& skill, int coinsToFlip);
+
+    // Hace las rondas del clash: cada ronda tiran todas las monedas que les quedan y el que saca menos pierde una moneda.
+    // Si empatan, se repite. Termina cuando a uno no le quedan monedas.
+    static ClashOutcome SimulateClash(const Skill& playerSkill, const Skill& enemySkill);
 
     // Ataca al objetivo con las primeras "coinsToUse" monedas de la skill. El poder va subiendo moneda por moneda
     // (base, base + primera cara, etc.) y cada moneda hace tanto dano como el poder que hay en ese momento.
@@ -40,6 +55,21 @@ namespace ReyesCuadra
         }
     }
 
+    float EstimateClashWinChance(const Skill& playerSkill, const Skill& enemySkill)
+    {
+        int playerWins = 0;
+
+        for (int simulation = 0; simulation < WIN_CHANCE_SIMULATIONS; simulation++)
+        {
+            if (SimulateClash(playerSkill, enemySkill).playerWon)
+            {
+                playerWins++;
+            }
+        }
+
+        return static_cast<float>(playerWins) / static_cast<float>(WIN_CHANCE_SIMULATIONS);
+    }
+
     static int RollClashPower(const Skill& skill, int coinsToFlip)
     {
         const std::vector<Coin>& coins = skill.GetCoins();
@@ -54,6 +84,37 @@ namespace ReyesCuadra
         }
 
         return power;
+    }
+
+    static ClashOutcome SimulateClash(const Skill& playerSkill, const Skill& enemySkill)
+    {
+        int playerCoins = playerSkill.GetCoinCount();
+        int enemyCoins = enemySkill.GetCoinCount();
+        int rounds = 0;
+
+        while (playerCoins > 0 && enemyCoins > 0 && rounds < MAX_CLASH_ROUNDS)
+        {
+            const int playerPower = RollClashPower(playerSkill, playerCoins);
+            const int enemyPower = RollClashPower(enemySkill, enemyCoins);
+
+            if (playerPower > enemyPower)
+            {
+                enemyCoins--;
+            }
+            else if (enemyPower > playerPower)
+            {
+                playerCoins--;
+            }
+
+            rounds++;
+        }
+
+        ClashOutcome outcome;
+        outcome.playerWon = playerCoins > 0;
+        outcome.winnerCoinsLeft = outcome.playerWon ? playerCoins : enemyCoins;
+        outcome.rounds = rounds;
+
+        return outcome;
     }
 
     static int PerformAttack(const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable)
@@ -124,41 +185,21 @@ namespace ReyesCuadra
             return;
         }
 
-        int playerCoins = playerSkill.GetCoinCount();
-        int enemyCoins = enemySkill.GetCoinCount();
-        int rounds = 0;
+        const ClashOutcome outcome = SimulateClash(playerSkill, enemySkill);
 
-        // Cada ronda tiran todas las monedas que les quedan; el que saca menos pierde una moneda. Si empatan se repite.
-        while (playerCoins > 0 && enemyCoins > 0 && rounds < MAX_CLASH_ROUNDS)
-        {
-            const int playerPower = RollClashPower(playerSkill, playerCoins);
-            const int enemyPower = RollClashPower(enemySkill, enemyCoins);
+        Unit& winner = outcome.playerWon ? player : enemy;
+        Unit& loser = outcome.playerWon ? enemy : player;
+        const Skill& winnerSkill = outcome.playerWon ? playerSkill : enemySkill;
+        const Skill& loserSkill = outcome.playerWon ? enemySkill : playerSkill;
 
-            if (playerPower > enemyPower)
-            {
-                enemyCoins--;
-            }
-            else if (enemyPower > playerPower)
-            {
-                playerCoins--;
-            }
+        // Se explica en criollo que paso: quien gano, cuantas monedas le quedaron y cuanto pego
+        std::string line = winner.GetName() + " gana el clash (" + winnerSkill.GetShortName() + " vs " + loserSkill.GetShortName() + "): le quedan " + std::to_string(outcome.winnerCoinsLeft);
 
-            rounds++;
-        }
-
-        const bool playerWon = playerCoins > 0;
-
-        Unit& winner = playerWon ? player : enemy;
-        Unit& loser = playerWon ? enemy : player;
-        const Skill& winnerSkill = playerWon ? playerSkill : enemySkill;
-        const Skill& loserSkill = playerWon ? enemySkill : playerSkill;
-        const int winnerCoinsLeft = playerWon ? playerCoins : enemyCoins;
-
-        std::string line = winner.GetName() + " (" + winnerSkill.GetShortName() + ") gana el clash a " + loserSkill.GetShortName() + " en " + std::to_string(rounds) + " rondas";
+        line += (outcome.winnerCoinsLeft == 1) ? " moneda" : " monedas";
 
         if (winnerSkill.DealsDamageOnWin())
         {
-            const int damage = PerformAttack(winnerSkill, winnerCoinsLeft, loser, false);
+            const int damage = PerformAttack(winnerSkill, outcome.winnerCoinsLeft, loser, false);
 
             line += " y pega " + std::to_string(damage) + " de daño.";
         }

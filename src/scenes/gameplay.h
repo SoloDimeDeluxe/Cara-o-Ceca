@@ -48,6 +48,9 @@ namespace ReyesCuadra
         // Pide al patron las skills de Lei Heng para el turno actual y le pone S1 por defecto a todos los slots de Yi Sang
         void PrepareTurn();
 
+        // Recalcula el porcentaje de victoria de cada columna (se llama cada vez que cambia alguna skill)
+        void UpdateWinChances();
+
         // Hace los clashes de todas las columnas y despues se fija si alguien murio
         void ResolveTurn();
 
@@ -60,8 +63,15 @@ namespace ReyesCuadra
         void DrawUnitPanels(sf::RenderWindow& window) const;
         void DrawSlots(sf::RenderWindow& window) const;
         void DrawSlotCard(sf::RenderWindow& window, sf::FloatRect bounds, const Skill* skill, sf::Color fillColor, bool isHighlighted) const;
+
+        // Dibuja entre las dos filas que tan probable es ganar el clash de esa columna (o si no hay clash)
+        void DrawClashPreview(sf::RenderWindow& window, int slotIndex, sf::FloatRect area) const;
+
         void DrawSkillButtons(sf::RenderWindow& window) const;
         void DrawGameOver(sf::RenderWindow& window) const;
+
+        // Cartel con las reglas del juego
+        void DrawHelp(sf::RenderWindow& window) const;
 
         const sf::Font& font;
 
@@ -85,12 +95,18 @@ namespace ReyesCuadra
         std::array<const Skill*, SLOT_COUNT> playerActions;
         std::vector<const Skill*> enemyActions;
 
+        // Chance de ganar el clash de cada columna (0 a 1). Un valor negativo significa que en esa columna no hay clash.
+        std::array<float, SLOT_COUNT> winChances;
+
         std::vector<Button> skillButtons;
         Button fightButton;
         Button restartButton;
+        Button helpButton;
+        Button closeHelpButton;
         CombatLog combatLog;
 
         GameState state;
+        bool isShowingHelp;
         int turn;
         int selectedSlot;
         sf::Vector2f mousePosition;
