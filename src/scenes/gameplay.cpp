@@ -71,13 +71,19 @@ namespace ReyesCuadra
     static const float RESTART_BUTTON_OFFSET_Y = 60.0f;
 
     // Cartel de "Como se juega" y el boton que lo abre
-    static const sf::Vector2f HELP_BOX_SIZE = { 820.0f, 580.0f };
+    static const sf::Vector2f HELP_BOX_SIZE = { 900.0f, 680.0f };
     static const float HELP_PADDING = 30.0f;
     static const float HELP_TITLE_HEIGHT = 56.0f;
-    static const float HELP_LINE_HEIGHT = 25.0f;
+    static const float HELP_LINE_HEIGHT = 23.0f;
     static const float HELP_RULE_GAP = 8.0f;
     static const sf::Vector2f CLOSE_HELP_BUTTON_SIZE = { 220.0f, 48.0f };
     static const sf::FloatRect HELP_BUTTON_BOUNDS = sf::FloatRect({ 1100.0f, 330.0f }, { 150.0f, 28.0f });
+
+    // Cartel con el detalle de una skill (se muestra al pasar el mouse por su boton)
+    static const float TOOLTIP_PADDING = 16.0f;
+    static const float TOOLTIP_TITLE_LINE_HEIGHT = 26.0f;
+    static const float TOOLTIP_LINE_HEIGHT = 23.0f;
+    static const float TOOLTIP_SECTION_GAP = 8.0f;
 
     // A partir de que porcentaje un clash se considera favorable o desfavorable
     static const float FAVORABLE_CHANCE = 0.6f;
@@ -97,6 +103,8 @@ namespace ReyesCuadra
     static const unsigned int GAME_OVER_TITLE_SIZE = 48;
     static const unsigned int HELP_TITLE_SIZE = 34;
     static const unsigned int HELP_RULE_SIZE = 18;
+    static const unsigned int TOOLTIP_TITLE_SIZE = 21;
+    static const unsigned int TOOLTIP_TEXT_SIZE = 17;
 
     // ---------- Colores ----------
 
@@ -128,7 +136,9 @@ namespace ReyesCuadra
         "3. En el clash los dos tiran sus monedas: cada cara suma poder. El que suma más le rompe una moneda al otro, y se repite hasta que uno se queda sin monedas.",
         "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes.",
         "5. Esquivar no es un clash: tirás una sola vez y cada golpe de Lei Heng que no supere tu número no te hace daño. Ahí el % es tu chance de esquivar todos los golpes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda un clash.",
-        "6. Poise: las skills de Yi Sang lo van cargando. Cada punto de potencia da 5% de chance de crítico (+20% de daño) y cada 6 de potencia suman +1 al poder de cada moneda. La cantidad baja 1 por crítico y 1 al final del turno; si llega a 0, se pierde."
+        "6. Poise: las skills de Yi Sang lo van cargando. Cada punto de potencia da 5% de chance de crítico (+20% de daño) y cada 6 de potencia suman +1 al poder de cada moneda. La cantidad baja 1 por crítico y 1 al final del turno; si llega a 0, se pierde.",
+        "7. Sinking: las skills de Yi Sang se lo ponen a Lei Heng. Cada vez que lo golpean pierde cordura igual a la potencia (si ya está en -45, pierde vida) y la cantidad baja 1.",
+        "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos."
     };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
@@ -205,6 +215,26 @@ namespace ReyesCuadra
         furiosoPoise.gainsCoinPowerFromPoise = true;
         playerSkills[SKILL_FURIOSO].SetPoiseEffects(furiosoPoise);
 
+        // Sinking que le pone cada skill de Yi Sang a Lei Heng (sacado de la wiki, uptie 4)
+        SinkingEffects skill1Sinking;
+        skill1Sinking.onHitWithoutCrackingPotency = 2;
+        playerSkills[SKILL_1].SetSinkingEffects(skill1Sinking);
+
+        SinkingEffects skill2Sinking;
+        skill2Sinking.onHitPotency = 3;
+        skill2Sinking.onHitWithoutCrackingCount = 1;
+        playerSkills[SKILL_2].SetSinkingEffects(skill2Sinking);
+
+        SinkingEffects skill3Sinking;
+        skill3Sinking.onHitPotency = 3;
+        skill3Sinking.onHitWithoutCrackingCount = 3;
+        playerSkills[SKILL_3].SetSinkingEffects(skill3Sinking);
+
+        SinkingEffects furiosoSinking;
+        furiosoSinking.onHitPotency = 1;
+        furiosoSinking.onHitWithoutCrackingCount = 3;
+        playerSkills[SKILL_FURIOSO].SetSinkingEffects(furiosoSinking);
+
         // Un boton por skill, uno abajo del otro
         for (size_t skillIndex = 0; skillIndex < playerSkills.size(); skillIndex++)
         {
@@ -212,11 +242,6 @@ namespace ReyesCuadra
             const float buttonY = SKILL_BUTTONS_TOP + static_cast<float>(skillIndex) * (SKILL_BUTTON_HEIGHT + SKILL_BUTTON_GAP);
             const std::string label = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + skill.GetName();
             std::string subLabel = skill.GetSummary();
-
-            if (!skill.GetPoiseSummary().empty())
-            {
-                subLabel += "  ·  " + skill.GetPoiseSummary();
-            }
 
             if (skill.IsLocked())
             {
@@ -253,8 +278,13 @@ namespace ReyesCuadra
         DrawSkillButtons(window);
         fightButton.Draw(window, mousePosition);
         combatLog.Draw(window);
-
         helpButton.Draw(window, mousePosition);
+
+        // Si el mouse esta sobre una skill, se muestra su detalle encima del registro
+        if (state == GameState::ChoosingSkills && !isShowingHelp)
+        {
+            DrawSkillTooltip(window);
+        }
 
         if (state != GameState::ChoosingSkills)
         {
@@ -536,6 +566,60 @@ namespace ReyesCuadra
         }
     }
 
+    void Gameplay::DrawSkillTooltip(sf::RenderWindow& window) const
+    {
+        for (size_t skillIndex = 0; skillIndex < skillButtons.size(); skillIndex++)
+        {
+            if (!skillButtons[skillIndex].Contains(mousePosition))
+            {
+                continue;
+            }
+
+            const Skill& skill = playerSkills[skillIndex];
+
+            // El cartel tapa el registro de combate mientras el mouse este sobre la skill
+            sf::RectangleShape panel(COMBAT_LOG_AREA.size);
+            panel.setPosition(COMBAT_LOG_AREA.position);
+            panel.setFillColor(GAME_OVER_BOX_COLOR);
+            panel.setOutlineColor(GOLD_COLOR);
+            panel.setOutlineThickness(SLOT_BORDER_THICKNESS);
+            window.draw(panel);
+
+            const float textX = COMBAT_LOG_AREA.position.x + TOOLTIP_PADDING;
+            const float textWidth = COMBAT_LOG_AREA.size.x - TOOLTIP_PADDING * 2.0f;
+            float lineY = COMBAT_LOG_AREA.position.y + TOOLTIP_PADDING / 2.0f;
+
+            const std::string title = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + skill.GetName();
+
+            for (const std::string& line : WrapText(font, title, TOOLTIP_TITLE_SIZE, textWidth))
+            {
+                DrawTextAt(window, font, line, TOOLTIP_TITLE_SIZE, { textX, lineY }, GOLD_COLOR);
+                lineY += TOOLTIP_TITLE_LINE_HEIGHT;
+            }
+
+            DrawTextAt(window, font, skill.GetSummary(), TOOLTIP_TEXT_SIZE, { textX, lineY }, DIM_TEXT_COLOR);
+            lineY += TOOLTIP_LINE_HEIGHT + TOOLTIP_SECTION_GAP;
+
+            std::vector<std::string> effectLines = skill.GetEffectLines();
+
+            if (effectLines.empty())
+            {
+                effectLines.push_back("Sin efectos especiales.");
+            }
+
+            for (const std::string& effect : effectLines)
+            {
+                for (const std::string& line : WrapText(font, effect, TOOLTIP_TEXT_SIZE, textWidth))
+                {
+                    DrawTextAt(window, font, line, TOOLTIP_TEXT_SIZE, { textX, lineY }, TEXT_COLOR);
+                    lineY += TOOLTIP_LINE_HEIGHT;
+                }
+            }
+
+            return;
+        }
+    }
+
     void Gameplay::DrawGameOver(sf::RenderWindow& window) const
     {
         // Se oscurece toda la pantalla y encima va el cartel con el resultado
@@ -672,21 +756,33 @@ namespace ReyesCuadra
         const std::string hpText = std::to_string(unit.GetHp()) + " / " + std::to_string(unit.GetMaxHp());
         DrawTextCentered(window, font, hpText, HP_TEXT_SIZE, sf::FloatRect({ barX, barY }, { HP_BAR_WIDTH, HP_BAR_HEIGHT }), TEXT_COLOR);
 
-        // Abajo de la barra se muestra el Poise, si tiene
+        // Abajo de la barra se muestra la cordura y los estados que tenga (Poise y Sinking), en una sola linea
         const Poise& poise = unit.GetPoise();
+        const Sinking& sinking = unit.GetSinking();
+        const std::string sanitySign = (unit.GetSanity() > 0) ? "+" : "";
+        std::string statusText = "SP " + sanitySign + std::to_string(unit.GetSanity()) + " (" + FormatPercent(unit.GetHeadsChance()) + " cara)";
 
         if (poise.IsActive())
         {
-            const std::string poiseText = "Poise: " + std::to_string(poise.GetPotency()) + " potencia · " + std::to_string(poise.GetCount()) + " cantidad (" + FormatPercent(poise.GetCriticalChance()) + " de crítico)";
-            const sf::Vector2f poisePosition = { barX, barY + HP_BAR_HEIGHT + POISE_TEXT_OFFSET_Y };
+            statusText += "     Poise " + std::to_string(poise.GetPotency()) + " pot. · " + std::to_string(poise.GetCount()) + " cant. (" + FormatPercent(poise.GetCriticalChance()) + " crítico)";
+        }
+
+        if (sinking.IsActive())
+        {
+            statusText += "     Sinking " + std::to_string(sinking.GetPotency()) + " pot. · " + std::to_string(sinking.GetCount()) + " cant.";
+        }
+
+        if (!statusText.empty())
+        {
+            const float statusY = barY + HP_BAR_HEIGHT + POISE_TEXT_OFFSET_Y;
 
             if (isRightSide)
             {
-                DrawTextRightAligned(window, font, poiseText, POISE_TEXT_SIZE, { barX + HP_BAR_WIDTH, poisePosition.y }, GOLD_COLOR);
+                DrawTextRightAligned(window, font, statusText, POISE_TEXT_SIZE, { barX + HP_BAR_WIDTH, statusY }, GOLD_COLOR);
             }
             else
             {
-                DrawTextAt(window, font, poiseText, POISE_TEXT_SIZE, poisePosition, GOLD_COLOR);
+                DrawTextAt(window, font, statusText, POISE_TEXT_SIZE, { barX, statusY }, GOLD_COLOR);
             }
         }
     }

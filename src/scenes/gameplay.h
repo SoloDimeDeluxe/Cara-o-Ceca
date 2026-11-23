@@ -77,6 +77,9 @@ namespace ReyesCuadra
         // Cartel con las reglas del juego
         void DrawHelp(sf::RenderWindow& window) const;
 
+        // Detalle de la skill que esta debajo del mouse (efectos de Poise, Sinking, etc.), encima del registro de combate
+        void DrawSkillTooltip(sf::RenderWindow& window) const;
+
         const sf::Font& font;
 
         Unit player;

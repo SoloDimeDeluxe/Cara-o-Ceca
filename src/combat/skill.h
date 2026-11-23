@@ -30,8 +30,21 @@ namespace ReyesCuadra
         // [Al hacer critico]: por cada golpe critico
         int onCriticalCount = 0;
 
-        // Si es true, la skill gana +1 de poder por moneda cada 6 de potencia de Poise (maximo +2)
+        // Si es true, la skill gana +1 de poder por moneda cada 6 de (Poise propio + Sinking del objetivo), maximo +2
         bool gainsCoinPowerFromPoise = false;
+    };
+
+    // Cuanto Sinking le pone una skill al objetivo (todo arranca en 0 = no pone nada)
+    struct SinkingEffects
+    {
+        // [Al golpear]: por cada moneda que pega
+        int onHitPotency = 0;
+        int onHitCount = 0;
+
+        // [Al golpear sin Cracking]: igual que el anterior, pero solo si el golpe no hace "Cracking".
+        // Como el juego todavia no tiene Cracking, por ahora se aplica en todos los golpes.
+        int onHitWithoutCrackingPotency = 0;
+        int onHitWithoutCrackingCount = 0;
     };
 
     // Skill que usa una unidad en un slot: poder base mas una lista de monedas
@@ -64,8 +77,12 @@ namespace ReyesCuadra
         const PoiseEffects& GetPoiseEffects() const;
         void SetPoiseEffects(const PoiseEffects& effects);
 
-        // Resumen de lo que da de Poise, por ejemplo "Poise: usar +2 cant. · golpe +2 pot." (vacio si no da nada)
-        std::string GetPoiseSummary() const;
+        // Efectos de Sinking de la skill
+        const SinkingEffects& GetSinkingEffects() const;
+        void SetSinkingEffects(const SinkingEffects& effects);
+
+        // Lineas de texto que explican los efectos de la skill (Poise, Sinking, bonus de poder), para el cartel de ayuda
+        std::vector<std::string> GetEffectLines() const;
 
         // Una skill bloqueada se ve en la lista pero no se puede elegir (por ejemplo Furioso-Replica hasta desbloquearla)
         bool IsLocked() const;
@@ -78,6 +95,7 @@ namespace ReyesCuadra
         int basePower;
         std::vector<Coin> coins;
         PoiseEffects poiseEffects;
+        SinkingEffects sinkingEffects;
         bool isLocked;
     };
 }

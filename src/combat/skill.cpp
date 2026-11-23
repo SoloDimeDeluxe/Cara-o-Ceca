@@ -2,6 +2,9 @@
 
 namespace ReyesCuadra
 {
+    // Arma el texto de cuanto estado se gana o inflige, por ejemplo "3 de potencia y +2 de cantidad"
+    static std::string DescribeStatusAmount(int potency, int count);
+
     Skill::Skill(const std::string& skillName, const std::string& skillShortName, SkillType skillType, int skillBasePower, int coinCount, int coinPower, bool hasUnbreakableCoins)
         : name(skillName)
         , shortName(skillShortName)
@@ -85,62 +88,53 @@ namespace ReyesCuadra
         poiseEffects = effects;
     }
 
-    std::string Skill::GetPoiseSummary() const
+    const SinkingEffects& Skill::GetSinkingEffects() const
     {
-        std::vector<std::string> parts;
+        return sinkingEffects;
+    }
 
+    void Skill::SetSinkingEffects(const SinkingEffects& effects)
+    {
+        sinkingEffects = effects;
+    }
+
+    std::vector<std::string> Skill::GetEffectLines() const
+    {
+        std::vector<std::string> lines;
+
+        // Poise (sobre quien usa la skill)
         if (poiseEffects.onUsePotency > 0 || poiseEffects.onUseCount > 0)
         {
-            std::string part = "usar";
-
-            if (poiseEffects.onUsePotency > 0)
-            {
-                part += " +" + std::to_string(poiseEffects.onUsePotency) + " pot.";
-            }
-
-            if (poiseEffects.onUseCount > 0)
-            {
-                part += " +" + std::to_string(poiseEffects.onUseCount) + " cant.";
-            }
-
-            parts.push_back(part);
+            lines.push_back("[Al usarla] Gana " + DescribeStatusAmount(poiseEffects.onUsePotency, poiseEffects.onUseCount) + " de Poise");
         }
 
         if (poiseEffects.onHitPotency > 0 || poiseEffects.onHitCount > 0)
         {
-            std::string part = "golpe";
-
-            if (poiseEffects.onHitPotency > 0)
-            {
-                part += " +" + std::to_string(poiseEffects.onHitPotency) + " pot.";
-            }
-
-            if (poiseEffects.onHitCount > 0)
-            {
-                part += " +" + std::to_string(poiseEffects.onHitCount) + " cant.";
-            }
-
-            parts.push_back(part);
+            lines.push_back("[Al golpear] Gana " + DescribeStatusAmount(poiseEffects.onHitPotency, poiseEffects.onHitCount) + " de Poise");
         }
 
         if (poiseEffects.onCriticalCount > 0)
         {
-            parts.push_back("crítico +" + std::to_string(poiseEffects.onCriticalCount) + " cant.");
+            lines.push_back("[Al hacer crítico] Gana " + DescribeStatusAmount(0, poiseEffects.onCriticalCount) + " de Poise");
         }
 
-        if (parts.empty())
+        // Sinking (sobre el objetivo)
+        if (sinkingEffects.onHitPotency > 0 || sinkingEffects.onHitCount > 0)
         {
-            return "";
+            lines.push_back("[Al golpear] Inflige " + DescribeStatusAmount(sinkingEffects.onHitPotency, sinkingEffects.onHitCount) + " de Sinking");
         }
 
-        std::string summary = "Poise: " + parts.front();
-
-        for (size_t partIndex = 1; partIndex < parts.size(); partIndex++)
+        if (sinkingEffects.onHitWithoutCrackingPotency > 0 || sinkingEffects.onHitWithoutCrackingCount > 0)
         {
-            summary += " · " + parts[partIndex];
+            lines.push_back("[Al golpear sin Cracking] Inflige " + DescribeStatusAmount(sinkingEffects.onHitWithoutCrackingPotency, sinkingEffects.onHitWithoutCrackingCount) + " de Sinking");
         }
 
-        return summary;
+        if (poiseEffects.gainsCoinPowerFromPoise)
+        {
+            lines.push_back("Poder de moneda +1 cada 6 de (Poise propio + Sinking del objetivo), máximo +2");
+        }
+
+        return lines;
     }
 
     bool Skill::IsLocked() const
@@ -151,5 +145,27 @@ namespace ReyesCuadra
     void Skill::SetLocked(bool locked)
     {
         isLocked = locked;
+    }
+
+    static std::string DescribeStatusAmount(int potency, int count)
+    {
+        std::string text;
+
+        if (potency > 0)
+        {
+            text = std::to_string(potency) + " de potencia";
+        }
+
+        if (count > 0)
+        {
+            if (!text.empty())
+            {
+                text += " y ";
+            }
+
+            text += "+" + std::to_string(count) + " de cantidad";
+        }
+
+        return text;
     }
 }

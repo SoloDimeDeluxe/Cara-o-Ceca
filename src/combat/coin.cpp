@@ -4,9 +4,6 @@
 
 namespace ReyesCuadra
 {
-    // Probabilidad de que una moneda salga cara (mas adelante la puede modificar la cordura)
-    static const float HEADS_CHANCE = 0.5f;
-
     Coin::Coin(int coinPower, bool coinIsUnbreakable)
         : power(coinPower)
         , isUnbreakable(coinIsUnbreakable)
@@ -23,8 +20,8 @@ namespace ReyesCuadra
         return isUnbreakable;
     }
 
-    bool Coin::Flip() const
+    bool Coin::Flip(float headsChance) const
     {
-        return RollChance(HEADS_CHANCE);
+        return RollChance(headsChance);
     }
 }

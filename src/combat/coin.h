@@ -15,8 +15,9 @@ namespace ReyesCuadra
         // Las monedas irrompibles siguen pegando aunque la skill pierda el clash
         bool IsUnbreakable() const;
 
-        // Tira la moneda: devuelve true si salio cara
-        bool Flip() const;
+        // Tira la moneda con la chance de cara indicada (0 a 1, depende de la cordura de quien la tira).
+        // Devuelve true si salio cara.
+        bool Flip(float headsChance) const;
 
     private:
         int power;

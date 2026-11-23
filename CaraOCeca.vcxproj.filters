@@ -30,6 +30,12 @@
     <ClCompile Include="src\combat\poise.cpp">
       <Filter>combat</Filter>
     </ClCompile>
+    <ClCompile Include="src\combat\sinking.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
+    <ClCompile Include="src\combat\status_effect.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
     <ClCompile Include="src\combat\skill.cpp">
       <Filter>combat</Filter>
     </ClCompile>
@@ -67,6 +73,12 @@
       <Filter>combat</Filter>
     </ClInclude>
     <ClInclude Include="src\combat\poise.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\sinking.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\status_effect.h">
       <Filter>combat</Filter>
     </ClInclude>
     <ClInclude Include="src\combat\skill.h">

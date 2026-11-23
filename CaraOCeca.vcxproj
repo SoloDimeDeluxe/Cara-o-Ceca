@@ -108,6 +108,8 @@ xcopy /y /d /e /i "$(ProjectDir)res" "$(OutDir)res"</Command>
     <ClCompile Include="src\combat\coin.cpp" />
     <ClCompile Include="src\combat\enemy_pattern.cpp" />
     <ClCompile Include="src\combat\poise.cpp" />
+    <ClCompile Include="src\combat\sinking.cpp" />
+    <ClCompile Include="src\combat\status_effect.cpp" />
     <ClCompile Include="src\combat\skill.cpp" />
     <ClCompile Include="src\combat\unit.cpp" />
     <ClCompile Include="src\game\game.cpp" />
@@ -123,6 +125,8 @@ xcopy /y /d /e /i "$(ProjectDir)res" "$(OutDir)res"</Command>
     <ClInclude Include="src\combat\coin.h" />
     <ClInclude Include="src\combat\enemy_pattern.h" />
     <ClInclude Include="src\combat\poise.h" />
+    <ClInclude Include="src\combat\sinking.h" />
+    <ClInclude Include="src\combat\status_effect.h" />
     <ClInclude Include="src\combat\skill.h" />
     <ClInclude Include="src\combat\unit.h" />
     <ClInclude Include="src\game\game.h" />
