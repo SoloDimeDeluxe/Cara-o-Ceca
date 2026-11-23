@@ -39,11 +39,40 @@ namespace ReyesCuadra
     // Clash entre dos skills: tiran monedas hasta que a una se le acaban, y la que gana pega con lo que le queda
     static void ResolveClash(Unit& player, const Skill& playerSkill, Unit& enemy, const Skill& enemySkill, CombatLog& log);
 
+    // Devuelve true si "evadeSkill" es una esquiva y "otherSkill" es algo que pega (ataque o contraataque)
+    static bool IsEvadeAgainstAttack(const Skill& evadeSkill, const Skill& otherSkill);
+
+    // Tira una sola vez las monedas de la esquiva y devuelve el numero que hay que superar para pegarle
+    static int RollEvadePower(const Skill& evadeSkill);
+
+    // Hace el ataque contra alguien que esquiva: la esquiva NO es un clash y no rompe monedas.
+    // El atacante pega moneda por moneda como siempre, pero solo hacen dano los golpes cuyo poder supera al de la esquiva.
+    // Devuelve el dano total y guarda en evadedHits cuantos golpes se esquivaron.
+    static int PerformAttackAgainstEvade(const Skill& attackSkill, int evadePower, Unit& target, int& evadedHits);
+
+    // Simula una esquiva sin hacer dano: devuelve true si se esquivaron todos los golpes
+    static bool SimulateFullEvade(const Skill& evadeSkill, const Skill& attackSkill);
+
+    // Resuelve la esquiva de verdad (con dano) y lo anota en el registro
+    static void ResolveEvade(Unit& evader, const Skill& evadeSkill, Unit& attacker, const Skill& attackSkill, CombatLog& log);
+
     void ResolveColumn(Unit& player, const Skill* playerSkill, Unit& enemy, const Skill* enemySkill, CombatLog& log)
     {
         if (playerSkill != nullptr && enemySkill != nullptr)
         {
-            ResolveClash(player, *playerSkill, enemy, *enemySkill, log);
+            // La esquiva no clashea: el otro ataca igual y se ve cuantos golpes se esquivan
+            if (IsEvadeAgainstAttack(*playerSkill, *enemySkill))
+            {
+                ResolveEvade(player, *playerSkill, enemy, *enemySkill, log);
+            }
+            else if (IsEvadeAgainstAttack(*enemySkill, *playerSkill))
+            {
+                ResolveEvade(enemy, *enemySkill, player, *playerSkill, log);
+            }
+            else
+            {
+                ResolveClash(player, *playerSkill, enemy, *enemySkill, log);
+            }
         }
         else if (playerSkill != nullptr)
         {
@@ -61,7 +90,24 @@ namespace ReyesCuadra
 
         for (int simulation = 0; simulation < WIN_CHANCE_SIMULATIONS; simulation++)
         {
-            if (SimulateClash(playerSkill, enemySkill).playerWon)
+            bool playerWon = false;
+
+            if (IsEvadeAgainstAttack(playerSkill, enemySkill))
+            {
+                // Si el jugador esquiva, "ganar" es esquivar todos los golpes
+                playerWon = SimulateFullEvade(playerSkill, enemySkill);
+            }
+            else if (IsEvadeAgainstAttack(enemySkill, playerSkill))
+            {
+                // Si el enemigo esquiva, "ganar" es que al menos un golpe del jugador entre
+                playerWon = !SimulateFullEvade(enemySkill, playerSkill);
+            }
+            else
+            {
+                playerWon = SimulateClash(playerSkill, enemySkill).playerWon;
+            }
+
+            if (playerWon)
             {
                 playerWins++;
             }
@@ -217,5 +263,91 @@ namespace ReyesCuadra
 
             log.AddLine("   Las monedas irrompibles de " + loser.GetName() + " pegan igual: " + std::to_string(damage) + " de daño.");
         }
+    }
+
+    static bool IsEvadeAgainstAttack(const Skill& evadeSkill, const Skill& otherSkill)
+    {
+        return evadeSkill.GetType() == SkillType::Evade && otherSkill.DealsDamageOnWin();
+    }
+
+    static int RollEvadePower(const Skill& evadeSkill)
+    {
+        return RollClashPower(evadeSkill, evadeSkill.GetCoinCount());
+    }
+
+    static int PerformAttackAgainstEvade(const Skill& attackSkill, int evadePower, Unit& target, int& evadedHits)
+    {
+        int power = attackSkill.GetBasePower();
+        int totalDamage = 0;
+
+        evadedHits = 0;
+
+        for (const Coin& coin : attackSkill.GetCoins())
+        {
+            if (target.IsDead())
+            {
+                break;
+            }
+
+            if (coin.Flip())
+            {
+                power += coin.GetPower();
+            }
+
+            // Para pegar hay que superar el numero de la esquiva (si empata, se esquiva)
+            if (power > evadePower)
+            {
+                target.TakeDamage(power);
+                totalDamage += power;
+            }
+            else
+            {
+                evadedHits++;
+            }
+        }
+
+        return totalDamage;
+    }
+
+    static bool SimulateFullEvade(const Skill& evadeSkill, const Skill& attackSkill)
+    {
+        const int evadePower = RollEvadePower(evadeSkill);
+        int power = attackSkill.GetBasePower();
+
+        for (const Coin& coin : attackSkill.GetCoins())
+        {
+            if (coin.Flip())
+            {
+                power += coin.GetPower();
+            }
+
+            if (power > evadePower)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    static void ResolveEvade(Unit& evader, const Skill& evadeSkill, Unit& attacker, const Skill& attackSkill, CombatLog& log)
+    {
+        const int evadePower = RollEvadePower(evadeSkill);
+        int evadedHits = 0;
+        const int damage = PerformAttackAgainstEvade(attackSkill, evadePower, evader, evadedHits);
+        const int totalHits = attackSkill.GetCoinCount();
+
+        std::string line = evader.GetName() + " esquiva (" + evadeSkill.GetShortName() + ") con " + std::to_string(evadePower) + ": evita " + std::to_string(evadedHits) + " de " + std::to_string(totalHits) + " golpes de " + attacker.GetName() + " (" + attackSkill.GetShortName() + ")";
+
+        if (damage > 0)
+        {
+            line += " y recibe " + std::to_string(damage) + " de daño.";
+        }
+        else
+        {
+            line += ". ¡No le hacen nada!";
+        }
+
+        log.AddLine(line);
     }
 }

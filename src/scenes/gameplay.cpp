@@ -125,7 +125,7 @@ namespace ReyesCuadra
         "2. Cada slot choca contra la skill de Lei Heng que tiene justo arriba. Eso es un clash.",
         "3. En el clash los dos tiran sus monedas: cada cara suma poder. El que suma más le rompe una moneda al otro, y se repite hasta que uno se queda sin monedas.",
         "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes.",
-        "5. Esquivar no hace daño, pero si gana te salva del golpe. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda el clash."
+        "5. Esquivar no es un clash: tirás una sola vez y cada golpe de Lei Heng que no supere tu número no te hace daño. Ahí el % es tu chance de esquivar todos los golpes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda un clash."
     };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
