@@ -152,6 +152,9 @@ namespace ReyesCuadra
     // Valor de columna que significa "ninguna"
     static const int NO_COLUMN = -1;
 
+    // Posicion que se usa cuando el mouse esta fuera de la ventana (no toca ningun boton)
+    static const sf::Vector2f OFFSCREEN_MOUSE_POSITION = { -1000.0f, -1000.0f };
+
     // A partir de que porcentaje un clash se considera favorable o desfavorable
     static const float FAVORABLE_CHANCE = 0.6f;
     static const float UNFAVORABLE_CHANCE = 0.4f;
@@ -419,6 +422,11 @@ namespace ReyesCuadra
         if (const sf::Event::MouseMoved* moved = event.getIf<sf::Event::MouseMoved>())
         {
             mousePosition = sf::Vector2f(moved->position);
+        }
+        else if (event.is<sf::Event::MouseLeft>())
+        {
+            // Si el mouse sale de la ventana, se lo manda lejos para que no quede nada resaltado
+            mousePosition = OFFSCREEN_MOUSE_POSITION;
         }
         else if (const sf::Event::MouseButtonPressed* pressed = event.getIf<sf::Event::MouseButtonPressed>())
         {
