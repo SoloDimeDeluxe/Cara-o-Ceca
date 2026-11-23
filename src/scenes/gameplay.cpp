@@ -17,6 +17,11 @@ namespace ReyesCuadra
     static const int ENEMY_MAX_HP = 4239;
     static const sf::Color ENEMY_COLOR = sf::Color(170, 60, 50);
 
+    // Umbrales de Stagger (proporcion de la vida maxima): Yi Sang a la mitad, Lei Heng al 70% y al 20%
+    static const float PLAYER_STAGGER_THRESHOLD = 0.5f;
+    static const float ENEMY_FIRST_STAGGER_THRESHOLD = 0.7f;
+    static const float ENEMY_SECOND_STAGGER_THRESHOLD = 0.2f;
+
     // Posicion de cada skill de Yi Sang dentro de playerSkills (y de los botones)
     enum PlayerSkillIndex
     {
@@ -41,6 +46,8 @@ namespace ReyesCuadra
     static const float SCREEN_HEIGHT = 720.0f;
     static const float TURN_LABEL_Y = 24.0f;
     static const float POISE_TEXT_OFFSET_Y = 4.0f;
+    static const float THRESHOLD_MARK_WIDTH = 3.0f;
+    static const float THRESHOLD_MARK_OVERHANG = 4.0f;
 
     // Tarjetas de los slots: una fila para Lei Heng arriba y otra para Yi Sang abajo
     static const float SLOTS_LEFT = 30.0f;
@@ -71,9 +78,9 @@ namespace ReyesCuadra
     static const float RESTART_BUTTON_OFFSET_Y = 60.0f;
 
     // Cartel de "Como se juega" y el boton que lo abre
-    static const sf::Vector2f HELP_BOX_SIZE = { 900.0f, 680.0f };
+    static const sf::Vector2f HELP_BOX_SIZE = { 940.0f, 700.0f };
     static const float HELP_PADDING = 30.0f;
-    static const float HELP_TITLE_HEIGHT = 56.0f;
+    static const float HELP_TITLE_HEIGHT = 50.0f;
     static const float HELP_LINE_HEIGHT = 23.0f;
     static const float HELP_RULE_GAP = 8.0f;
     static const sf::Vector2f CLOSE_HELP_BUTTON_SIZE = { 220.0f, 48.0f };
@@ -119,6 +126,8 @@ namespace ReyesCuadra
     static const sf::Color SLOT_BORDER_COLOR = sf::Color(90, 80, 70);
     static const sf::Color OVERLAY_COLOR = sf::Color(0, 0, 0, 170);
     static const sf::Color GAME_OVER_BOX_COLOR = sf::Color(30, 27, 33);
+    static const sf::Color STAGGER_COLOR = sf::Color(235, 110, 60);
+    static const sf::Color BROKEN_THRESHOLD_COLOR = sf::Color(90, 85, 80);
     static const sf::Color FAVORABLE_COLOR = sf::Color(120, 200, 120);
     static const sf::Color EVEN_COLOR = sf::Color(225, 195, 95);
     static const sf::Color UNFAVORABLE_COLOR = sf::Color(215, 95, 85);
@@ -138,7 +147,8 @@ namespace ReyesCuadra
         "5. Esquivar no es un clash: tirás una sola vez y cada golpe de Lei Heng que no supere tu número no te hace daño. Ahí el % es tu chance de esquivar todos los golpes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda un clash.",
         "6. Poise: las skills de Yi Sang lo van cargando. Cada punto de potencia da 5% de chance de crítico (+20% de daño) y cada 6 de potencia suman +1 al poder de cada moneda. La cantidad baja 1 por crítico y 1 al final del turno; si llega a 0, se pierde.",
         "7. Sinking: las skills de Yi Sang se lo ponen a Lei Heng. Cada vez que lo golpean pierde cordura igual a la potencia (si ya está en -45, pierde vida) y la cantidad baja 1.",
-        "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos."
+        "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos.",
+        "9. Stagger: las marcas en las barras de vida son umbrales. Si la vida baja de uno, esa unidad queda staggereada: pierde lo que le quedaba del turno, no actúa el turno siguiente y mientras tanto recibe el doble de daño."
     };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
@@ -177,6 +187,9 @@ namespace ReyesCuadra
         , selectedSlot(0)
         , mousePosition({ 0.0f, 0.0f })
     {
+        player.SetStaggerThresholds({ PLAYER_STAGGER_THRESHOLD });
+        enemy.SetStaggerThresholds({ ENEMY_FIRST_STAGGER_THRESHOLD, ENEMY_SECOND_STAGGER_THRESHOLD });
+
         // Numeros sacados de Yi Sang Index Nursefather (uptie 4): poder base, cantidad de monedas y poder por moneda
         playerSkills.push_back(Skill("Envolver 330 veces en largas franjas de sangre congelada", "S1: Envolver 330 veces", SkillType::Attack, 3, 2, 4, false));
         playerSkills.push_back(Skill("Regocíjate con aplausos silenciosos, empala en dolor silencioso", "S2: Regocíjate", SkillType::Attack, 4, 3, 4, false));
@@ -313,10 +326,18 @@ namespace ReyesCuadra
 
     void Gameplay::PrepareTurn()
     {
-        enemyActions = enemyPattern.GetActionsForTurn(turn, enemy.GetHpRatio());
+        // Una unidad staggereada no actua este turno
+        if (enemy.IsStaggered())
+        {
+            enemyActions.clear();
+        }
+        else
+        {
+            enemyActions = enemyPattern.GetActionsForTurn(turn, enemy.GetHpRatio());
+        }
 
-        // Para no tener que elegir los 6 slots cada turno, arrancan todos con S1
-        playerActions.fill(&playerSkills[SKILL_1]);
+        // Para no tener que elegir los 6 slots cada turno, arrancan todos con S1 (o vacios si Yi Sang esta staggereado)
+        playerActions.fill(player.IsStaggered() ? nullptr : &playerSkills[SKILL_1]);
         selectedSlot = 0;
 
         UpdateWinChances();
@@ -382,15 +403,41 @@ namespace ReyesCuadra
                 break;
             }
 
-            const Skill* playerSkill = playerActions[static_cast<size_t>(slotIndex)];
-            const Skill* enemySkill = (slotIndex < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(slotIndex)] : nullptr;
+            // Si alguno quedo staggereado en una columna anterior, pierde las acciones que le quedaban
+            const Skill* playerSkill = player.IsStaggered() ? nullptr : playerActions[static_cast<size_t>(slotIndex)];
+            const Skill* enemySkill = nullptr;
+
+            if (!enemy.IsStaggered() && slotIndex < static_cast<int>(enemyActions.size()))
+            {
+                enemySkill = enemyActions[static_cast<size_t>(slotIndex)];
+            }
 
             ResolveColumn(player, playerSkill, enemy, enemySkill, combatLog);
+
+            if (player.ConsumeStaggerEvent())
+            {
+                combatLog.AddLine("¡Yi Sang queda staggereado! Pierde lo que le quedaba del turno y no actúa el próximo.");
+            }
+
+            if (enemy.ConsumeStaggerEvent())
+            {
+                combatLog.AddLine("¡Lei Heng queda staggereado! Pierde lo que le quedaba del turno y no actúa el próximo.");
+            }
         }
 
-        // Al final del turno, la cantidad de Poise baja 1
+        // Al final del turno, la cantidad de Poise baja 1 y los staggereados avanzan su recuperacion
         player.GetPoise().OnTurnEnd();
         enemy.GetPoise().OnTurnEnd();
+
+        if (player.UpdateStaggerOnTurnEnd())
+        {
+            combatLog.AddLine("Yi Sang se recupera del Stagger.");
+        }
+
+        if (enemy.UpdateStaggerOnTurnEnd())
+        {
+            combatLog.AddLine("Lei Heng se recupera del Stagger.");
+        }
 
         if (enemy.IsDead())
         {
@@ -424,6 +471,21 @@ namespace ReyesCuadra
             if (restartButton.Contains(clickPosition))
             {
                 StartNewGame();
+            }
+
+            return;
+        }
+
+        // Si Yi Sang esta staggereado no puede elegir skills: solo puede apretar Combatir (o la ayuda)
+        if (player.IsStaggered())
+        {
+            if (fightButton.Contains(clickPosition))
+            {
+                ResolveTurn();
+            }
+            else if (helpButton.Contains(clickPosition))
+            {
+                isShowingHelp = true;
             }
 
             return;
@@ -488,22 +550,29 @@ namespace ReyesCuadra
             const Skill* enemySkill = (slotIndex < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(slotIndex)] : nullptr;
             const sf::FloatRect enemyBounds = GetSlotBounds(slotIndex, false);
 
-            DrawSlotCard(window, enemyBounds, enemySkill, ENEMY_SLOT_COLOR, false);
+            DrawSlotCard(window, enemyBounds, enemySkill, ENEMY_SLOT_COLOR, false, enemy.IsStaggered() ? "Staggereado" : "Sin acción");
 
             const sf::FloatRect previewArea({ enemyBounds.position.x, VS_ROW_Y }, { SLOT_WIDTH, VS_ROW_HEIGHT });
             DrawClashPreview(window, slotIndex, previewArea);
 
             // Fila de abajo: lo que eligio el jugador para Yi Sang
             const sf::FloatRect playerBounds = GetSlotBounds(slotIndex, true);
-            const bool isHighlighted = (state == GameState::ChoosingSkills) && (slotIndex == selectedSlot || playerBounds.contains(mousePosition));
+            const bool isHighlighted = (state == GameState::ChoosingSkills) && !player.IsStaggered() && (slotIndex == selectedSlot || playerBounds.contains(mousePosition));
 
-            DrawSlotCard(window, playerBounds, playerActions[static_cast<size_t>(slotIndex)], PLAYER_SLOT_COLOR, isHighlighted);
+            DrawSlotCard(window, playerBounds, playerActions[static_cast<size_t>(slotIndex)], PLAYER_SLOT_COLOR, isHighlighted, player.IsStaggered() ? "Staggereado" : "Sin acción");
         }
 
-        DrawTextAt(window, font, "Clic en un slot de Yi Sang y después en una skill. El % entre las filas es tu chance de ganar ese clash.", HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
+        if (player.IsStaggered())
+        {
+            DrawTextAt(window, font, "Yi Sang está staggereado: este turno no puede actuar. Apretá ¡Combatir! para seguir.", HINT_SIZE, { SLOTS_LEFT, HINT_Y }, STAGGER_COLOR);
+        }
+        else
+        {
+            DrawTextAt(window, font, "Clic en un slot de Yi Sang y después en una skill. El % entre las filas es tu chance de ganar ese clash.", HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
+        }
     }
 
-    void Gameplay::DrawSlotCard(sf::RenderWindow& window, sf::FloatRect bounds, const Skill* skill, sf::Color fillColor, bool isHighlighted) const
+    void Gameplay::DrawSlotCard(sf::RenderWindow& window, sf::FloatRect bounds, const Skill* skill, sf::Color fillColor, bool isHighlighted, const std::string& emptyText) const
     {
         sf::RectangleShape card(bounds.size);
         card.setPosition(bounds.position);
@@ -514,7 +583,7 @@ namespace ReyesCuadra
 
         if (skill == nullptr)
         {
-            DrawTextCentered(window, font, "Sin acción", SLOT_NAME_SIZE, bounds, DIM_TEXT_COLOR);
+            DrawTextCentered(window, font, emptyText, SLOT_NAME_SIZE, bounds, DIM_TEXT_COLOR);
             return;
         }
 
@@ -546,7 +615,15 @@ namespace ReyesCuadra
         {
             std::string label = "No chocan";
 
-            if (enemySkill == nullptr && playerSkill != nullptr)
+            if (playerSkill == nullptr && enemySkill != nullptr)
+            {
+                label = "Te pega directo";
+            }
+            else if (playerSkill == nullptr)
+            {
+                label = "-";
+            }
+            else if (enemySkill == nullptr)
             {
                 label = playerSkill->IsDefensive() ? "Sin rival" : "Sin rival: pegás directo";
             }
@@ -753,6 +830,17 @@ namespace ReyesCuadra
         barFill.setFillColor(HP_BAR_FILL);
         window.draw(barFill);
 
+        // Marcas de los umbrales de Stagger: doradas si todavia no se rompieron, grises si ya se rompieron
+        const std::vector<float>& thresholds = unit.GetStaggerThresholds();
+
+        for (size_t thresholdIndex = 0; thresholdIndex < thresholds.size(); thresholdIndex++)
+        {
+            sf::RectangleShape mark({ THRESHOLD_MARK_WIDTH, HP_BAR_HEIGHT + THRESHOLD_MARK_OVERHANG * 2.0f });
+            mark.setPosition({ barX + HP_BAR_WIDTH * thresholds[thresholdIndex] - THRESHOLD_MARK_WIDTH / 2.0f, barY - THRESHOLD_MARK_OVERHANG });
+            mark.setFillColor(unit.IsThresholdBroken(thresholdIndex) ? BROKEN_THRESHOLD_COLOR : GOLD_COLOR);
+            window.draw(mark);
+        }
+
         const std::string hpText = std::to_string(unit.GetHp()) + " / " + std::to_string(unit.GetMaxHp());
         DrawTextCentered(window, font, hpText, HP_TEXT_SIZE, sf::FloatRect({ barX, barY }, { HP_BAR_WIDTH, HP_BAR_HEIGHT }), TEXT_COLOR);
 
@@ -760,7 +848,7 @@ namespace ReyesCuadra
         const Poise& poise = unit.GetPoise();
         const Sinking& sinking = unit.GetSinking();
         const std::string sanitySign = (unit.GetSanity() > 0) ? "+" : "";
-        std::string statusText = "SP " + sanitySign + std::to_string(unit.GetSanity()) + " (" + FormatPercent(unit.GetHeadsChance()) + " cara)";
+        std::string statusText = unit.IsStaggered() ? "STAGGER     SP " + sanitySign : "SP " + sanitySign + std::to_string(unit.GetSanity()) + " (" + FormatPercent(unit.GetHeadsChance()) + " cara)";
 
         if (poise.IsActive())
         {
@@ -772,18 +860,16 @@ namespace ReyesCuadra
             statusText += "     Sinking " + std::to_string(sinking.GetPotency()) + " pot. · " + std::to_string(sinking.GetCount()) + " cant.";
         }
 
-        if (!statusText.empty())
-        {
-            const float statusY = barY + HP_BAR_HEIGHT + POISE_TEXT_OFFSET_Y;
+        const float statusY = barY + HP_BAR_HEIGHT + POISE_TEXT_OFFSET_Y;
+        const sf::Color statusColor = unit.IsStaggered() ? STAGGER_COLOR : GOLD_COLOR;
 
-            if (isRightSide)
-            {
-                DrawTextRightAligned(window, font, statusText, POISE_TEXT_SIZE, { barX + HP_BAR_WIDTH, statusY }, GOLD_COLOR);
-            }
-            else
-            {
-                DrawTextAt(window, font, statusText, POISE_TEXT_SIZE, { barX, statusY }, GOLD_COLOR);
-            }
+        if (isRightSide)
+        {
+            DrawTextRightAligned(window, font, statusText, POISE_TEXT_SIZE, { barX + HP_BAR_WIDTH, statusY }, statusColor);
+        }
+        else
+        {
+            DrawTextAt(window, font, statusText, POISE_TEXT_SIZE, { barX, statusY }, statusColor);
         }
     }
 }

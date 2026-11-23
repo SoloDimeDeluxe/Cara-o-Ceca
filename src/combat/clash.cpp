@@ -14,6 +14,9 @@ namespace ReyesCuadra
     // Un golpe critico hace este multiplicador de dano (+20%)
     static const float CRITICAL_DAMAGE_MULTIPLIER = 1.2f;
 
+    // Una unidad staggereada recibe el doble de dano de los golpes
+    static const float STAGGERED_DAMAGE_MULTIPLIER = 2.0f;
+
     // Cordura que gana quien gana un clash: base 10, +20% por cada ronda despues de la primera (redondeado para abajo)
     static const int SANITY_PER_CLASH_WIN = 10;
     static const float SANITY_BONUS_PER_EXTRA_ROUND = 0.2f;
@@ -350,6 +353,12 @@ namespace ReyesCuadra
                 {
                     attacker.GetPoise().AddCount(effects.onCriticalCount);
                 }
+            }
+
+            // Si el objetivo esta staggereado, el golpe pega el doble (el Sinking, que es dano fijo, no)
+            if (target.IsStaggered())
+            {
+                hitDamage = static_cast<int>(std::round(static_cast<float>(hitDamage) * STAGGERED_DAMAGE_MULTIPLIER));
             }
 
             target.TakeDamage(hitDamage);

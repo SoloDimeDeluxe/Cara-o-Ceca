@@ -2,6 +2,7 @@
 #define GAMEPLAY_H
 
 #include <array>
+#include <string>
 #include <vector>
 
 #include <SFML/Graphics.hpp>
@@ -66,7 +67,8 @@ namespace ReyesCuadra
 
         void DrawUnitPanels(sf::RenderWindow& window) const;
         void DrawSlots(sf::RenderWindow& window) const;
-        void DrawSlotCard(sf::RenderWindow& window, sf::FloatRect bounds, const Skill* skill, sf::Color fillColor, bool isHighlighted) const;
+        // Dibuja la tarjeta de un slot. Si no hay skill, muestra emptyText (por ejemplo "Sin acción" o "Staggereado").
+        void DrawSlotCard(sf::RenderWindow& window, sf::FloatRect bounds, const Skill* skill, sf::Color fillColor, bool isHighlighted, const std::string& emptyText) const;
 
         // Dibuja entre las dos filas que tan probable es ganar el clash de esa columna (o si no hay clash)
         void DrawClashPreview(sf::RenderWindow& window, int slotIndex, sf::FloatRect area) const;

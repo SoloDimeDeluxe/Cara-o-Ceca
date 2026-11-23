@@ -2,6 +2,7 @@
 #define UNIT_H
 
 #include <string>
+#include <vector>
 
 #include <SFML/Graphics/Color.hpp>
 
@@ -25,8 +26,25 @@ namespace ReyesCuadra
 
         sf::Color GetColor() const;
 
-        // Le resta vida a la unidad, sin bajar de 0
+        // Le resta vida a la unidad, sin bajar de 0. Si la vida baja de un umbral de Stagger, la unidad queda staggereada.
         void TakeDamage(int damage);
+
+        // Umbrales de Stagger, como proporcion de la vida maxima (por ejemplo 0.7 = al 70% de vida). Cada uno se rompe una vez.
+        void SetStaggerThresholds(const std::vector<float>& thresholds);
+        const std::vector<float>& GetStaggerThresholds() const;
+
+        // Devuelve true si el umbral con ese indice ya se rompio
+        bool IsThresholdBroken(size_t thresholdIndex) const;
+
+        // Una unidad staggereada no actua (hasta el final del turno siguiente) y recibe el doble de dano de los golpes
+        bool IsStaggered() const;
+
+        // Devuelve true una sola vez despues de quedar staggereada (para avisarlo en el registro)
+        bool ConsumeStaggerEvent();
+
+        // Se llama al final de cada turno: si estaba staggereada, avanza la recuperacion.
+        // Devuelve true si justo se recupero en este turno.
+        bool UpdateStaggerOnTurnEnd();
 
         bool IsDead() const;
 
@@ -59,6 +77,10 @@ namespace ReyesCuadra
         int hp;
         int sanity;
         sf::Color color;
+        std::vector<float> staggerThresholds;
+        size_t brokenThresholds;
+        int staggerTurnEndsLeft;
+        bool hasPendingStaggerEvent;
         Poise poise;
         Sinking sinking;
     };
