@@ -20,6 +20,9 @@ namespace ReyesCuadra
         bool IsEnabled() const;
         void SetEnabled(bool enabled);
 
+        // Cambia el texto principal del boton (por ejemplo "¡Combatir!" -> "Saltear")
+        void SetLabel(const std::string& text);
+
         // Texto corto que se muestra pegado al borde derecho del boton (por ejemplo, la chance de ganar el clash).
         // Con un texto vacio no se muestra nada.
         void SetRightText(const std::string& text, sf::Color color);

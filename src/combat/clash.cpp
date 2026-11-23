@@ -101,7 +101,11 @@ namespace ReyesCuadra
     // Cada golpe puede ser critico segun el Poise del atacante, y aplica los efectos [Al golpear].
     // Si onlyUnbreakable es true, solo pegan las monedas irrompibles.
     // Si evadePower es mayor o igual a 0, el objetivo esta esquivando: solo pegan los golpes que superan ese numero.
-    static AttackResult PerformAttack(Unit& attacker, const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable, int evadePower);
+    // Cada golpe, Stagger y Tremor Burst se anota en la linea de tiempo.
+    static AttackResult PerformAttack(Unit& attacker, const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable, int evadePower, CombatTimeline& timeline);
+
+    // Si el objetivo acaba de quedar staggereado, lo anota (cartel grande y linea en el registro)
+    static void RecordStaggerIfAny(Unit& target, CombatTimeline& timeline);
 
     // Cuenta cuantas monedas irrompibles tiene la skill
     static int CountUnbreakableCoins(const Skill& skill);
@@ -110,10 +114,10 @@ namespace ReyesCuadra
     static std::string DescribeExtras(const AttackResult& result);
 
     // Ataque sin oposicion: la skill pega con todas sus monedas (las defensas solas no hacen nada)
-    static void ResolveOneSidedAction(Unit& attacker, const Skill& skill, Unit& target, CombatLog& log);
+    static void ResolveOneSidedAction(Unit& attacker, const Skill& skill, Unit& target, CombatTimeline& timeline);
 
     // Clash entre dos skills: tiran monedas hasta que a una se le acaban, y la que gana pega con lo que le queda
-    static void ResolveClash(Unit& player, const Skill& playerSkill, Unit& enemy, const Skill& enemySkill, CombatLog& log);
+    static void ResolveClash(Unit& player, const Skill& playerSkill, Unit& enemy, const Skill& enemySkill, CombatTimeline& timeline);
 
     // Devuelve true si "evadeSkill" es una esquiva y "otherSkill" es algo que pega (ataque o contraataque)
     static bool IsEvadeAgainstAttack(const Skill& evadeSkill, const Skill& otherSkill);
@@ -123,10 +127,15 @@ namespace ReyesCuadra
 
     // Resuelve la esquiva de verdad: la esquiva NO es un clash y no rompe monedas. Se tira una sola vez y
     // el atacante pega moneda por moneda; solo hacen dano los golpes cuyo poder supera al de la esquiva.
-    static void ResolveEvade(Unit& evader, const Skill& evadeSkill, Unit& attacker, const Skill& attackSkill, CombatLog& log);
+    // Devuelve true si se esquivaron todos los golpes (la esquiva sigue en pie).
+    static bool ResolveEvade(Unit& evader, const Skill& evadeSkill, Unit& attacker, const Skill& attackSkill, CombatTimeline& timeline);
 
-    void ResolveColumn(Unit& player, const Skill* playerSkill, Unit& enemy, const Skill* enemySkill, CombatLog& log)
+    bool ResolveColumn(Unit& player, const Skill* playerSkill, Unit& enemy, const Skill* enemySkill, CombatTimeline& timeline)
     {
+        // Una esquiva del jugador sigue en pie salvo que la ataquen y algun golpe la supere
+        const bool playerIsEvading = playerSkill != nullptr && playerSkill->GetType() == SkillType::Evade;
+        bool playerEvadeHeld = playerIsEvading;
+
         // Lo primero es el [Al usarla] de cada skill, asi el Poise ganado ya cuenta para el clash
         if (playerSkill != nullptr)
         {
@@ -143,25 +152,27 @@ namespace ReyesCuadra
             // La esquiva no clashea: el otro ataca igual y se ve cuantos golpes se esquivan
             if (IsEvadeAgainstAttack(*playerSkill, *enemySkill))
             {
-                ResolveEvade(player, *playerSkill, enemy, *enemySkill, log);
+                playerEvadeHeld = ResolveEvade(player, *playerSkill, enemy, *enemySkill, timeline);
             }
             else if (IsEvadeAgainstAttack(*enemySkill, *playerSkill))
             {
-                ResolveEvade(enemy, *enemySkill, player, *playerSkill, log);
+                ResolveEvade(enemy, *enemySkill, player, *playerSkill, timeline);
             }
             else
             {
-                ResolveClash(player, *playerSkill, enemy, *enemySkill, log);
+                ResolveClash(player, *playerSkill, enemy, *enemySkill, timeline);
             }
         }
         else if (playerSkill != nullptr)
         {
-            ResolveOneSidedAction(player, *playerSkill, enemy, log);
+            ResolveOneSidedAction(player, *playerSkill, enemy, timeline);
         }
         else if (enemySkill != nullptr)
         {
-            ResolveOneSidedAction(enemy, *enemySkill, player, log);
+            ResolveOneSidedAction(enemy, *enemySkill, player, timeline);
         }
+
+        return playerEvadeHeld && !player.IsDead() && !player.IsStaggered();
     }
 
     float EstimateClashWinChance(const Unit& player, const Skill& playerSkill, const Unit& enemy, const Skill& enemySkill)
@@ -423,7 +434,7 @@ namespace ReyesCuadra
         return static_cast<int>(static_cast<float>(SANITY_PER_CLASH_WIN) * multiplier);
     }
 
-    static AttackResult PerformAttack(Unit& attacker, const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable, int evadePower)
+    static AttackResult PerformAttack(Unit& attacker, const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable, int evadePower, CombatTimeline& timeline)
     {
         const std::vector<Coin>& coins = skill.GetCoins();
         const PoiseEffects& effects = skill.GetPoiseEffects();
@@ -454,7 +465,9 @@ namespace ReyesCuadra
 
             int hitDamage = (power > 0) ? power : 0;
 
-            if (attacker.GetPoise().RollCritical())
+            const bool isCritical = attacker.GetPoise().RollCritical();
+
+            if (isCritical)
             {
                 hitDamage = static_cast<int>(std::round(static_cast<float>(hitDamage) * CRITICAL_DAMAGE_MULTIPLIER));
                 result.criticalHits++;
@@ -473,6 +486,8 @@ namespace ReyesCuadra
 
             target.TakeDamage(hitDamage);
             result.damage += hitDamage;
+            timeline.AddHit(target, hitDamage, isCritical);
+            RecordStaggerIfAny(target, timeline);
 
             // Si el objetivo tenia Sinking, se activa con el golpe: pierde cordura, o vida si ya esta en -45
             const int sinkingAmount = target.GetSinking().Trigger();
@@ -483,6 +498,8 @@ namespace ReyesCuadra
                 {
                     target.TakeDamage(sinkingAmount);
                     result.sinkingDamage += sinkingAmount;
+                    timeline.AddHit(target, sinkingAmount, false);
+                    RecordStaggerIfAny(target, timeline);
                 }
                 else
                 {
@@ -495,7 +512,14 @@ namespace ReyesCuadra
             ApplyOnHitSinking(skill, target);
 
             // Burn y Tremor de esta moneda (y Tremor Burst si la moneda lo tiene)
-            result.tremorBurstRaise += ApplyOnHitTargetStatuses(skill, static_cast<size_t>(coinIndex), target);
+            const int burstRaise = ApplyOnHitTargetStatuses(skill, static_cast<size_t>(coinIndex), target);
+
+            if (burstRaise > 0)
+            {
+                result.tremorBurstRaise += burstRaise;
+                timeline.AddBanner("TREMOR BURST");
+                RecordStaggerIfAny(target, timeline);
+            }
 
             // Efectos [Al golpear]
             if (effects.onHitPotency > 0)
@@ -510,6 +534,15 @@ namespace ReyesCuadra
         }
 
         return result;
+    }
+
+    static void RecordStaggerIfAny(Unit& target, CombatTimeline& timeline)
+    {
+        if (target.ConsumeStaggerEvent())
+        {
+            timeline.AddBanner("¡STAGGER!");
+            timeline.AddLogLine("¡" + target.GetName() + " queda staggereado! Pierde lo que le quedaba del turno y no actúa el próximo.");
+        }
     }
 
     static int CountUnbreakableCoins(const Skill& skill)
@@ -569,26 +602,26 @@ namespace ReyesCuadra
         return extras.empty() ? "" : " (" + extras + ")";
     }
 
-    static void ResolveOneSidedAction(Unit& attacker, const Skill& skill, Unit& target, CombatLog& log)
+    static void ResolveOneSidedAction(Unit& attacker, const Skill& skill, Unit& target, CombatTimeline& timeline)
     {
         // Esquivar o contraatacar sin nadie enfrente no hace nada
         if (skill.IsDefensive())
         {
-            log.AddLine(attacker.GetName() + " se queda en guardia con " + skill.GetShortName() + ", pero nadie lo ataca.");
+            timeline.AddLogLine(attacker.GetName() + " se queda en guardia con " + skill.GetShortName() + ", pero nadie lo ataca.");
             return;
         }
 
-        const AttackResult result = PerformAttack(attacker, skill, skill.GetCoinCount(), target, false, -1);
+        const AttackResult result = PerformAttack(attacker, skill, skill.GetCoinCount(), target, false, -1, timeline);
 
-        log.AddLine(attacker.GetName() + " ataca sin oposición con " + skill.GetShortName() + ": " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".");
+        timeline.AddLogLine(attacker.GetName() + " ataca sin oposición con " + skill.GetShortName() + ": " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".");
     }
 
-    static void ResolveClash(Unit& player, const Skill& playerSkill, Unit& enemy, const Skill& enemySkill, CombatLog& log)
+    static void ResolveClash(Unit& player, const Skill& playerSkill, Unit& enemy, const Skill& enemySkill, CombatTimeline& timeline)
     {
         // Dos defensas enfrentadas no pelean entre si
         if (playerSkill.IsDefensive() && enemySkill.IsDefensive())
         {
-            log.AddLine(player.GetName() + " y " + enemy.GetName() + " se quedan a la defensiva. No pasa nada.");
+            timeline.AddLogLine(player.GetName() + " y " + enemy.GetName() + " se quedan a la defensiva. No pasa nada.");
             return;
         }
 
@@ -612,7 +645,7 @@ namespace ReyesCuadra
 
         if (winnerSkill.DealsDamageOnWin())
         {
-            const AttackResult result = PerformAttack(winner, winnerSkill, outcome.winnerCoinsLeft, loser, false, -1);
+            const AttackResult result = PerformAttack(winner, winnerSkill, outcome.winnerCoinsLeft, loser, false, -1, timeline);
 
             line += " y pega " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".";
         }
@@ -621,14 +654,14 @@ namespace ReyesCuadra
             line += " y esquiva el ataque.";
         }
 
-        log.AddLine(line);
+        timeline.AddLogLine(line);
 
         // Las monedas irrompibles del que perdio pegan igual despues del ganador (si sigue vivo)
         if (!loser.IsDead() && !loserSkill.IsDefensive() && CountUnbreakableCoins(loserSkill) > 0)
         {
-            const AttackResult result = PerformAttack(loser, loserSkill, loserSkill.GetCoinCount(), winner, true, -1);
+            const AttackResult result = PerformAttack(loser, loserSkill, loserSkill.GetCoinCount(), winner, true, -1, timeline);
 
-            log.AddLine("   Las monedas irrompibles de " + loser.GetName() + " pegan igual: " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".");
+            timeline.AddLogLine("   Las monedas irrompibles de " + loser.GetName() + " pegan igual: " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".");
         }
     }
 
@@ -658,12 +691,12 @@ namespace ReyesCuadra
         return true;
     }
 
-    static void ResolveEvade(Unit& evader, const Skill& evadeSkill, Unit& attacker, const Skill& attackSkill, CombatLog& log)
+    static bool ResolveEvade(Unit& evader, const Skill& evadeSkill, Unit& attacker, const Skill& attackSkill, CombatTimeline& timeline)
     {
         // La esquiva se tira una sola vez
         const ClashSide evadeSide = { &evadeSkill, GetBasePowerBonus(evadeSkill, attacker), GetCoinPowerBonus(evadeSkill, evader, attacker), evader.GetHeadsChance() };
         const int evadePower = RollClashPower(evadeSide, evadeSkill.GetCoinCount());
-        const AttackResult result = PerformAttack(attacker, attackSkill, attackSkill.GetCoinCount(), evader, false, evadePower);
+        const AttackResult result = PerformAttack(attacker, attackSkill, attackSkill.GetCoinCount(), evader, false, evadePower, timeline);
 
         std::string line = evader.GetName() + " esquiva (" + evadeSkill.GetShortName() + ") con " + std::to_string(evadePower) + ": evita " + std::to_string(result.evadedHits) + " de " + std::to_string(attackSkill.GetCoinCount()) + " golpes de " + attacker.GetName() + " (" + attackSkill.GetShortName() + ")";
 
@@ -676,6 +709,9 @@ namespace ReyesCuadra
             line += ". ¡No le hacen nada!";
         }
 
-        log.AddLine(line);
+        timeline.AddLogLine(line);
+
+        // La esquiva aguanta solo si no la supero ningun golpe
+        return result.evadedHits >= attackSkill.GetCoinCount();
     }
 }

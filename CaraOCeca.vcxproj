@@ -106,6 +106,7 @@ xcopy /y /d /e /i "$(ProjectDir)res" "$(OutDir)res"</Command>
   <ItemGroup>
     <ClCompile Include="src\combat\burn.cpp" />
     <ClCompile Include="src\combat\clash.cpp" />
+    <ClCompile Include="src\combat\combat_timeline.cpp" />
     <ClCompile Include="src\combat\coin.cpp" />
     <ClCompile Include="src\combat\enemy_pattern.cpp" />
     <ClCompile Include="src\combat\poise.cpp" />
@@ -125,6 +126,7 @@ xcopy /y /d /e /i "$(ProjectDir)res" "$(OutDir)res"</Command>
   <ItemGroup>
     <ClInclude Include="src\combat\burn.h" />
     <ClInclude Include="src\combat\clash.h" />
+    <ClInclude Include="src\combat\combat_timeline.h" />
     <ClInclude Include="src\combat\coin.h" />
     <ClInclude Include="src\combat\enemy_pattern.h" />
     <ClInclude Include="src\combat\poise.h" />

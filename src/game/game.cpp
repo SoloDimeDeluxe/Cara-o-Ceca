@@ -45,9 +45,15 @@ namespace ReyesCuadra
 
         Gameplay gameplay(font);
 
+        // Mide cuanto tiempo paso entre un frame y el siguiente (para las animaciones)
+        sf::Clock frameClock;
+
         while (window.isOpen())
         {
+            const float deltaSeconds = frameClock.restart().asSeconds();
+
             HandleWindowEvents(window, gameplay);
+            gameplay.Update(deltaSeconds);
             DrawFrame(window, gameplay);
         }
     }

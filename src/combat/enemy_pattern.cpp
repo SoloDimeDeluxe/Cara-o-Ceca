@@ -9,9 +9,6 @@ namespace ReyesCuadra
     static const int CYCLE_LENGTH = 3;
     static const int COMBO_TURNS_PER_CYCLE = 2;
 
-    // Con esta proporcion de vida o menos, Lei Heng cambia su ataque fuerte
-    static const float FINISHER_HP_RATIO = 0.4f;
-
     // Cantidad de cada skill en los turnos de arranque
     static const int OPENING_TRIPLE_SLASHES = 2;
     static const int OPENING_DOUBLE_SLASHES = 4;
@@ -24,16 +21,15 @@ namespace ReyesCuadra
     // Agrega "amount" veces la skill a la lista de acciones
     static void AddRepeated(std::vector<const Skill*>& actions, const Skill* skill, int amount);
 
-    EnemyPattern::EnemyPattern(const Skill& doubleSlashSkill, const Skill& tripleSlashSkill, const Skill& explosiveSlashSkill, const Skill& tangleCutterSkill, const Skill& tigerslayerFlurrySkill)
+    EnemyPattern::EnemyPattern(const Skill& doubleSlashSkill, const Skill& tripleSlashSkill, const Skill& explosiveSlashSkill, const Skill& tangleCutterSkill)
         : doubleSlash(&doubleSlashSkill)
         , tripleSlash(&tripleSlashSkill)
         , explosiveSlash(&explosiveSlashSkill)
         , tangleCutter(&tangleCutterSkill)
-        , tigerslayerFlurry(&tigerslayerFlurrySkill)
     {
     }
 
-    std::vector<const Skill*> EnemyPattern::GetActionsForTurn(int turn, float hpRatio) const
+    std::vector<const Skill*> EnemyPattern::GetActionsForTurn(int turn) const
     {
         std::vector<const Skill*> actions;
 
@@ -53,10 +49,6 @@ namespace ReyesCuadra
             AddRepeated(actions, explosiveSlash, COMBO_EXPLOSIVE_SLASHES);
             AddRepeated(actions, tripleSlash, COMBO_TRIPLE_SLASHES);
             AddRepeated(actions, doubleSlash, COMBO_DOUBLE_SLASHES);
-        }
-        else if (hpRatio <= FINISHER_HP_RATIO)
-        {
-            actions.push_back(tigerslayerFlurry);
         }
         else
         {

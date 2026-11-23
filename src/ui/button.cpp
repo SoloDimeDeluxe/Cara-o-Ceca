@@ -48,6 +48,11 @@ namespace ReyesCuadra
         isEnabled = enabled;
     }
 
+    void Button::SetLabel(const std::string& text)
+    {
+        label = text;
+    }
+
     void Button::SetRightText(const std::string& text, sf::Color color)
     {
         rightText = text;

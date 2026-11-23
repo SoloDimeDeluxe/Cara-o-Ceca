@@ -24,6 +24,9 @@
     <ClCompile Include="src\combat\clash.cpp">
       <Filter>combat</Filter>
     </ClCompile>
+    <ClCompile Include="src\combat\combat_timeline.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
     <ClCompile Include="src\combat\coin.cpp">
       <Filter>combat</Filter>
     </ClCompile>
@@ -73,6 +76,9 @@
       <Filter>combat</Filter>
     </ClInclude>
     <ClInclude Include="src\combat\clash.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\combat_timeline.h">
       <Filter>combat</Filter>
     </ClInclude>
     <ClInclude Include="src\combat\coin.h">

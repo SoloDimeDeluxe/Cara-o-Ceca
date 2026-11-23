@@ -9,7 +9,7 @@ namespace ReyesCuadra
 
     bool RollChance(float chance)
     {
-        // bernoulli_distribution devuelve true con la probabilidad que se le pasa
+        // bernoulli_distribution devuelve true con la probabilidad que se le pasan
         std::bernoulli_distribution distribution(static_cast<double>(chance));
 
         return distribution(GetGenerator());

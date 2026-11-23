@@ -1,5 +1,6 @@
 #include "scenes/gameplay.h"
 
+#include <cmath>
 #include <string>
 
 #include "combat/clash.h"
@@ -96,6 +97,34 @@ namespace ReyesCuadra
     // asi un doble clic no "atraviesa" el cartel y aprieta lo que hay abajo (por ejemplo, Combatir)
     static const float CLICK_COOLDOWN_SECONDS = 0.35f;
 
+    // Cuanto dura en pantalla cada tipo de paso de la pelea (en segundos)
+    static const float COLUMN_START_DURATION = 0.45f;
+    static const float HIT_DURATION = 0.32f;
+    static const float BANNER_DURATION = 0.9f;
+    static const float LOG_LINE_DURATION = 0.2f;
+
+    // Animaciones
+    static const float FLOATING_TEXT_DURATION = 0.9f;
+    static const float FLOATING_TEXT_RISE_SPEED = 45.0f;
+    static const float FLOATING_TEXT_OFFSET_Y = 18.0f;
+    static const unsigned int FLOATING_TEXT_SIZE = 26;
+    static const unsigned int CRITICAL_TEXT_SIZE = 32;
+    static const float HP_BAR_ANIMATION_SPEED = 8.0f;
+    static const float SHAKE_DURATION = 0.18f;
+    static const float SHAKE_DISTANCE = 5.0f;
+    static const float SHAKE_FREQUENCY = 90.0f;
+    static const float ACTIVE_COLUMN_PADDING = 6.0f;
+    static const unsigned int BANNER_TEXT_SIZE = 54;
+    static const float BANNER_HEIGHT = 84.0f;
+    static const float BANNER_CENTER_Y = 218.0f;
+    static const sf::Color BANNER_BACKGROUND = sf::Color(0, 0, 0, 190);
+    static const sf::Color ACTIVE_COLUMN_COLOR = sf::Color(220, 190, 120, 40);
+    static const sf::Color DAMAGE_COLOR = sf::Color(255, 120, 100);
+    static const sf::Color CRITICAL_DAMAGE_COLOR = sf::Color(255, 215, 90);
+
+    // Valor de columna que significa "ninguna"
+    static const int NO_COLUMN = -1;
+
     // A partir de que porcentaje un clash se considera favorable o desfavorable
     static const float FAVORABLE_CHANCE = 0.6f;
     static const float UNFAVORABLE_CHANCE = 0.4f;
@@ -144,11 +173,11 @@ namespace ReyesCuadra
     // Reglas que se muestran en el cartel de "Como se juega", una por parrafo
     static const char* HELP_RULES[] =
     {
-        "1. Cada turno elegís una skill para cada uno de los 6 slots de Yi Sang (fila de abajo).",
-        "2. Cada slot choca contra la skill de Lei Heng que tiene justo arriba. Eso es un clash.",
+        "1. Cada turno Lei Heng hace hasta 6 acciones, una por columna (fila de arriba). Vos tenés 3 acciones para Yi Sang (fila de abajo): ponelas en las columnas que quieras frenar.",
+        "2. Clic en una columna de Yi Sang y después en una skill para ponerla ahí; clic derecho para sacarla. Si Yi Sang tiene acción, choca con la de arriba (clash); si no, ese ataque te pega directo.",
         "3. En el clash los dos tiran sus monedas: cada cara suma poder. El que suma más le rompe una moneda al otro, y se repite hasta que uno se queda sin monedas.",
-        "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes.",
-        "5. Esquivar no es un clash: tirás una sola vez y cada golpe de Lei Heng que no supere tu número no te hace daño. Ahí el % es tu chance de esquivar todos los golpes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda un clash.",
+        "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda el clash.",
+        "5. Esquivar no es un clash: tirás una sola vez y cada golpe que no supere tu número no te hace daño. Si esquivás todo, la esquiva sigue activa y enfrenta los próximos ataques que te entren directo, hasta que un golpe la supere o termine el turno. Ponela temprano para que cubra más.",
         "6. Poise: las skills de Yi Sang lo van cargando. Cada punto de potencia da 5% de chance de crítico (+20% de daño) y cada 6 de potencia suman +1 al poder de cada moneda. La cantidad baja 1 por crítico y 1 al final del turno; si llega a 0, se pierde.",
         "7. Sinking: las skills de Yi Sang se lo ponen a Lei Heng. Cada vez que lo golpean pierde cordura igual a la potencia (si ya está en -45, pierde vida) y la cantidad baja 1.",
         "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos (también las de Lei Heng).",
@@ -167,7 +196,8 @@ namespace ReyesCuadra
     static std::string FormatPercent(float winChance);
 
     // Dibuja el cuadrado de color, el nombre y la barra de vida de una unidad. Si isRightSide es true, se dibuja espejado a la derecha.
-    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide);
+    // shownHp es la vida que se ve en la barra (baja de a poco durante la pelea).
+    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp);
 
     Gameplay::Gameplay(const sf::Font& gameFont)
         : font(gameFont)
@@ -177,11 +207,11 @@ namespace ReyesCuadra
         , tripleSlash("Triple Corte - Explosión", "Triple Corte - Explosión", SkillType::Attack, 3, 3, 3, false)
         , explosiveSlash("Tajo Destrozador Explosivo", "Tajo Destrozador Explosivo", SkillType::Attack, 4, 3, 3, true)
         , tangleCutter("Cortador de enredos", "Cortador de enredos", SkillType::Attack, 8, 1, 12, true)
-        , tigerslayerFlurry("Ráfaga de espadas perfeccionada marca Savage Tigerslayer", "Ráfaga Savage Tigerslayer", SkillType::Attack, 3, 6, 3, true)
         , tiantuiReload("Recargando espada tiantui", "Recargando espada tiantui", SkillType::Counter, 4, 2, 4, false)
-        , enemyPattern(doubleSlash, tripleSlash, explosiveSlash, tangleCutter, tigerslayerFlurry)
+        , enemyPattern(doubleSlash, tripleSlash, explosiveSlash, tangleCutter)
         , playerActions()
         , winChances()
+        , columnCoveredByEvade()
         , fightButton(gameFont, sf::FloatRect({ MARGIN, FIGHT_BUTTON_Y }, { SKILL_BUTTON_WIDTH, FIGHT_BUTTON_HEIGHT }), "¡Combatir!", "")
         , restartButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - RESTART_BUTTON_SIZE.x) / 2.0f, SCREEN_HEIGHT / 2.0f + RESTART_BUTTON_OFFSET_Y - RESTART_BUTTON_SIZE.y / 2.0f }, RESTART_BUTTON_SIZE), "Jugar de nuevo", "")
         , helpButton(gameFont, HELP_BUTTON_BOUNDS, "¿Cómo se juega?", "")
@@ -192,6 +222,20 @@ namespace ReyesCuadra
         , turn(1)
         , selectedSlot(0)
         , mousePosition({ 0.0f, 0.0f })
+        , timeline(player, enemy)
+        , nextEventIndex(0)
+        , eventTimer(0.0f)
+        , stateAfterPlayback(GameState::ChoosingSkills)
+        , activeColumn(NO_COLUMN)
+        , shownPlayerHp(static_cast<float>(PLAYER_MAX_HP))
+        , shownEnemyHp(static_cast<float>(ENEMY_MAX_HP))
+        , targetPlayerHp(static_cast<float>(PLAYER_MAX_HP))
+        , targetEnemyHp(static_cast<float>(ENEMY_MAX_HP))
+        , bannerText("")
+        , bannerTimeLeft(0.0f)
+        , shakeColumn(NO_COLUMN)
+        , shakeIsPlayerRow(false)
+        , shakeTimeLeft(0.0f)
     {
         player.SetStaggerThresholds({ PLAYER_STAGGER_THRESHOLD });
         enemy.SetStaggerThresholds({ ENEMY_FIRST_STAGGER_THRESHOLD, ENEMY_SECOND_STAGGER_THRESHOLD });
@@ -330,17 +374,6 @@ namespace ReyesCuadra
         tangleCutterEffects.perCoin[0].countLossAfterBurst = 1;
         tangleCutter.SetTargetStatusEffects(tangleCutterEffects);
 
-        // Rafaga de espadas perfeccionada marca Savage Tigerslayer
-        TargetStatusEffects tigerslayerEffects;
-        tigerslayerEffects.perCoin.resize(6);
-        tigerslayerEffects.perCoin[0].burnPotency = 6;
-        tigerslayerEffects.perCoin[1].burnCount = 6;
-        tigerslayerEffects.perCoin[2].tremorPotency = 6;
-        tigerslayerEffects.perCoin[3].tremorCount = 6;
-        tigerslayerEffects.perCoin[5].burstTimes = 1;
-        tigerslayerEffects.perCoin[5].burstOnlyWithoutCracking = true;
-        tigerslayerEffects.perCoin[5].countLossAfterBurst = 1;
-        tigerslayerFlurry.SetTargetStatusEffects(tigerslayerEffects);
 
         StartNewGame();
     }
@@ -358,13 +391,74 @@ namespace ReyesCuadra
             {
                 HandleClick(sf::Vector2f(pressed->position));
             }
+            else if (pressed->button == sf::Mouse::Button::Right)
+            {
+                HandleRightClick(sf::Vector2f(pressed->position));
+            }
+        }
+    }
+
+    void Gameplay::Update(float deltaSeconds)
+    {
+        // Pelea paso a paso: cuando se termina el tiempo de un paso, se muestra el siguiente
+        if (state == GameState::PlayingTurn)
+        {
+            eventTimer -= deltaSeconds;
+
+            while (state == GameState::PlayingTurn && eventTimer <= 0.0f)
+            {
+                const std::vector<CombatEvent>& events = timeline.GetEvents();
+
+                if (nextEventIndex >= events.size())
+                {
+                    FinishPlayback();
+                    break;
+                }
+
+                PlayEvent(events[nextEventIndex]);
+                nextEventIndex++;
+            }
+        }
+
+        // Las barras de vida bajan de a poco hasta la vida de ese momento de la pelea
+        const float hpStep = deltaSeconds * HP_BAR_ANIMATION_SPEED;
+        const float hpLerp = (hpStep > 1.0f) ? 1.0f : hpStep;
+
+        shownPlayerHp += (targetPlayerHp - shownPlayerHp) * hpLerp;
+        shownEnemyHp += (targetEnemyHp - shownEnemyHp) * hpLerp;
+
+        // Los numeros flotantes suben y desaparecen
+        for (FloatingText& floatingText : floatingTexts)
+        {
+            floatingText.timeLeft -= deltaSeconds;
+            floatingText.position.y -= FLOATING_TEXT_RISE_SPEED * deltaSeconds;
+        }
+
+        for (size_t textIndex = floatingTexts.size(); textIndex > 0; textIndex--)
+        {
+            if (floatingTexts[textIndex - 1].timeLeft <= 0.0f)
+            {
+                floatingTexts.erase(floatingTexts.begin() + static_cast<std::ptrdiff_t>(textIndex - 1));
+            }
+        }
+
+        if (bannerTimeLeft > 0.0f)
+        {
+            bannerTimeLeft -= deltaSeconds;
+        }
+
+        if (shakeTimeLeft > 0.0f)
+        {
+            shakeTimeLeft -= deltaSeconds;
         }
     }
 
     void Gameplay::Draw(sf::RenderWindow& window) const
     {
         DrawUnitPanels(window);
+        DrawActiveColumn(window);
         DrawSlots(window);
+        DrawFloatingTexts(window);
         DrawSkillButtons(window);
         fightButton.Draw(window, mousePosition);
         combatLog.Draw(window);
@@ -376,7 +470,9 @@ namespace ReyesCuadra
             DrawSkillTooltip(window);
         }
 
-        if (state != GameState::ChoosingSkills)
+        DrawBanner(window);
+
+        if (state == GameState::Victory || state == GameState::Defeat)
         {
             DrawGameOver(window);
         }
@@ -395,8 +491,21 @@ namespace ReyesCuadra
         turn = 1;
         state = GameState::ChoosingSkills;
 
+        // Se limpian las animaciones y las barras vuelven a estar llenas
+        timeline.Clear();
+        nextEventIndex = 0;
+        activeColumn = NO_COLUMN;
+        floatingTexts.clear();
+        bannerTimeLeft = 0.0f;
+        shakeTimeLeft = 0.0f;
+        shownPlayerHp = static_cast<float>(player.GetHp());
+        shownEnemyHp = static_cast<float>(enemy.GetHp());
+        targetPlayerHp = shownPlayerHp;
+        targetEnemyHp = shownEnemyHp;
+        fightButton.SetLabel("¡Combatir!");
+
         combatLog.Clear();
-        combatLog.AddLine("Elegí una skill para cada slot de Yi Sang y apretá ¡Combatir!");
+        combatLog.AddLine("Poné las 3 acciones de Yi Sang en las columnas que quieras frenar y apretá ¡Combatir!");
 
         PrepareTurn();
     }
@@ -410,11 +519,20 @@ namespace ReyesCuadra
         }
         else
         {
-            enemyActions = enemyPattern.GetActionsForTurn(turn, enemy.GetHpRatio());
+            enemyActions = enemyPattern.GetActionsForTurn(turn);
         }
 
-        // Para no tener que elegir los 6 slots cada turno, arrancan todos con S1 (o vacios si Yi Sang esta staggereado)
-        playerActions.fill(player.IsStaggered() ? nullptr : &playerSkills[SKILL_1]);
+        // Las 3 acciones de Yi Sang arrancan con S1 en las primeras 3 columnas (o ninguna si esta staggereado)
+        playerActions.fill(nullptr);
+
+        if (!player.IsStaggered())
+        {
+            for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
+            {
+                playerActions[static_cast<size_t>(actionIndex)] = &playerSkills[SKILL_1];
+            }
+        }
+
         selectedSlot = 0;
 
         UpdateWinChances();
@@ -422,10 +540,26 @@ namespace ReyesCuadra
 
     void Gameplay::UpdateWinChances()
     {
+        // Se recorre en orden: si hay una esquiva antes, se asume que sigue activa y cubre los ataques que entran directo
+        const Skill* pendingEvade = nullptr;
+
         for (int slotIndex = 0; slotIndex < SLOT_COUNT; slotIndex++)
         {
             const Skill* playerSkill = playerActions[static_cast<size_t>(slotIndex)];
             const Skill* enemySkill = (slotIndex < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(slotIndex)] : nullptr;
+
+            if (playerSkill != nullptr && playerSkill->GetType() == SkillType::Evade)
+            {
+                pendingEvade = playerSkill;
+            }
+
+            const bool coveredByEvade = playerSkill == nullptr && pendingEvade != nullptr && enemySkill != nullptr && enemySkill->DealsDamageOnWin();
+            columnCoveredByEvade[static_cast<size_t>(slotIndex)] = coveredByEvade;
+
+            if (coveredByEvade)
+            {
+                playerSkill = pendingEvade;
+            }
 
             // Solo hay clash si estan las dos skills y al menos una de las dos ataca
             const bool hasClash = playerSkill != nullptr && enemySkill != nullptr && !(playerSkill->IsDefensive() && enemySkill->IsDefensive());
@@ -470,9 +604,15 @@ namespace ReyesCuadra
 
     void Gameplay::ResolveTurn()
     {
-        combatLog.AddLine("-- Turno " + std::to_string(turn) + " --");
+        // La logica resuelve todo el turno de una y anota cada paso en la linea de tiempo;
+        // despues la pantalla lo va mostrando de a poco (PlayingTurn)
+        timeline.Clear();
+        timeline.AddLogLine("-- Turno " + std::to_string(turn) + " --");
 
-        // Cada slot de Yi Sang se enfrenta con el slot de Lei Heng que tiene justo arriba
+        // Esquiva de Yi Sang que sigue activa: cubre los ataques que le entran directo hasta que pierde o termina el turno
+        const Skill* activeEvade = nullptr;
+
+        // Cada accion de Yi Sang se enfrenta con la accion de Lei Heng de esa misma columna
         for (int slotIndex = 0; slotIndex < SLOT_COUNT; slotIndex++)
         {
             if (player.IsDead() || enemy.IsDead())
@@ -489,17 +629,38 @@ namespace ReyesCuadra
                 enemySkill = enemyActions[static_cast<size_t>(slotIndex)];
             }
 
-            ResolveColumn(player, playerSkill, enemy, enemySkill, combatLog);
-
-            if (player.ConsumeStaggerEvent())
+            // Columna sin acciones de nadie: no hay nada que mostrar
+            if (playerSkill == nullptr && enemySkill == nullptr)
             {
-                combatLog.AddLine("¡Yi Sang queda staggereado! Pierde lo que le quedaba del turno y no actúa el próximo.");
+                continue;
             }
 
-            if (enemy.ConsumeStaggerEvent())
+            timeline.StartColumn(slotIndex);
+
+            // Si Yi Sang no tiene accion aca pero tiene una esquiva activa, la esquiva enfrenta este ataque
+            const bool usesActiveEvade = playerSkill == nullptr && activeEvade != nullptr && !player.IsStaggered() && enemySkill->DealsDamageOnWin();
+
+            if (usesActiveEvade)
             {
-                combatLog.AddLine("¡Lei Heng queda staggereado! Pierde lo que le quedaba del turno y no actúa el próximo.");
+                timeline.AddLogLine("La esquiva de Yi Sang sigue activa y enfrenta este ataque.");
+                playerSkill = activeEvade;
             }
+
+            const bool evadeHeld = ResolveColumn(player, playerSkill, enemy, enemySkill, timeline);
+            const bool usedEvade = playerSkill != nullptr && playerSkill->GetType() == SkillType::Evade;
+
+            // La esquiva queda activa si aguanto; si la superaron, se pierde
+            if (usedEvade)
+            {
+                activeEvade = evadeHeld ? playerSkill : nullptr;
+
+                if (!evadeHeld && !player.IsDead())
+                {
+                    timeline.AddLogLine("La esquiva de Yi Sang se rompió.");
+                }
+            }
+
+            timeline.EndColumn();
         }
 
         // Al final del turno quema el Burn (dano fijo); despues la cantidad de Poise y de Tremor baja 1
@@ -514,29 +675,142 @@ namespace ReyesCuadra
 
         if (player.UpdateStaggerOnTurnEnd())
         {
-            combatLog.AddLine("Yi Sang se recupera del Stagger.");
+            timeline.AddLogLine("Yi Sang se recupera del Stagger.");
         }
 
         if (enemy.UpdateStaggerOnTurnEnd())
         {
-            combatLog.AddLine("Lei Heng se recupera del Stagger.");
+            timeline.AddLogLine("Lei Heng se recupera del Stagger.");
         }
 
+        // Como queda la partida cuando termine de mostrarse el turno
         if (enemy.IsDead())
         {
-            state = GameState::Victory;
-            combatLog.AddLine("¡Lei Heng cayó!");
+            stateAfterPlayback = GameState::Victory;
+            timeline.AddBanner("¡LEI HENG CAYÓ!");
+            timeline.AddLogLine("¡Lei Heng cayó!");
         }
         else if (player.IsDead())
         {
-            state = GameState::Defeat;
-            combatLog.AddLine("Yi Sang cayó...");
+            stateAfterPlayback = GameState::Defeat;
+            timeline.AddBanner("YI SANG CAYÓ");
+            timeline.AddLogLine("Yi Sang cayó...");
         }
         else
+        {
+            stateAfterPlayback = GameState::ChoosingSkills;
+        }
+
+        // Arranca a mostrarse la pelea
+        state = GameState::PlayingTurn;
+        nextEventIndex = 0;
+        eventTimer = 0.0f;
+        fightButton.SetLabel("Saltear");
+    }
+
+    int Gameplay::CountPlayerActions() const
+    {
+        int actionCount = 0;
+
+        for (const Skill* action : playerActions)
+        {
+            if (action != nullptr)
+            {
+                actionCount++;
+            }
+        }
+
+        return actionCount;
+    }
+
+    void Gameplay::PlayEvent(const CombatEvent& event)
+    {
+        // Todos los pasos traen la vida de los dos en ese momento: las barras van hacia ahi
+        targetPlayerHp = static_cast<float>(event.playerHpAfter);
+        targetEnemyHp = static_cast<float>(event.enemyHpAfter);
+
+        switch (event.type)
+        {
+            case CombatEventType::ColumnStart:
+            {
+                activeColumn = event.column;
+                eventTimer += COLUMN_START_DURATION;
+                break;
+            }
+            case CombatEventType::Hit:
+            {
+                // Numero de dano flotando sobre la tarjeta del que recibe el golpe, y la tarjeta se sacude
+                FloatingText floatingText;
+                floatingText.text = event.isCritical ? "-" + std::to_string(event.damage) + "!" : "-" + std::to_string(event.damage);
+                floatingText.position = GetHitPosition(event);
+                floatingText.color = event.isCritical ? CRITICAL_DAMAGE_COLOR : DAMAGE_COLOR;
+                floatingText.timeLeft = FLOATING_TEXT_DURATION;
+                floatingTexts.push_back(floatingText);
+
+                shakeColumn = event.column;
+                shakeIsPlayerRow = event.targetIsPlayer;
+                shakeTimeLeft = SHAKE_DURATION;
+
+                eventTimer += HIT_DURATION;
+                break;
+            }
+            case CombatEventType::Banner:
+            {
+                bannerText = event.text;
+                bannerTimeLeft = BANNER_DURATION;
+                eventTimer += BANNER_DURATION;
+                break;
+            }
+            case CombatEventType::LogLine:
+            {
+                combatLog.AddLine(event.text);
+                eventTimer += LOG_LINE_DURATION;
+                break;
+            }
+        }
+    }
+
+    void Gameplay::FinishPlayback()
+    {
+        // Si se apreto Saltear, se pasan al registro todas las lineas que faltaban
+        const std::vector<CombatEvent>& events = timeline.GetEvents();
+
+        for (size_t eventIndex = nextEventIndex; eventIndex < events.size(); eventIndex++)
+        {
+            if (events[eventIndex].type == CombatEventType::LogLine)
+            {
+                combatLog.AddLine(events[eventIndex].text);
+            }
+        }
+
+        nextEventIndex = events.size();
+        activeColumn = NO_COLUMN;
+        targetPlayerHp = static_cast<float>(player.GetHp());
+        targetEnemyHp = static_cast<float>(enemy.GetHp());
+        fightButton.SetLabel("¡Combatir!");
+
+        state = stateAfterPlayback;
+
+        if (state == GameState::ChoosingSkills)
         {
             turn++;
             PrepareTurn();
         }
+    }
+
+    sf::Vector2f Gameplay::GetHitPosition(const CombatEvent& event) const
+    {
+        // Golpe fuera de las columnas (la quemada del final del turno): sale sobre la barra de vida
+        if (event.column == NO_COLUMN)
+        {
+            const float barCenterX = event.targetIsPlayer ? MARGIN + NAME_OFFSET_X + HP_BAR_WIDTH / 2.0f : SCREEN_WIDTH - MARGIN - NAME_OFFSET_X - HP_BAR_WIDTH / 2.0f;
+
+            return { barCenterX, PANEL_TOP + HP_BAR_OFFSET_Y + HP_BAR_HEIGHT + FLOATING_TEXT_OFFSET_Y };
+        }
+
+        const sf::FloatRect bounds = GetSlotBounds(event.column, event.targetIsPlayer);
+
+        return { bounds.position.x + bounds.size.x / 2.0f, bounds.position.y + FLOATING_TEXT_OFFSET_Y };
     }
 
     void Gameplay::ApplyBurnAtTurnEnd(Unit& unit)
@@ -554,12 +828,14 @@ namespace ReyesCuadra
         }
 
         unit.TakeDamage(burnDamage);
-        combatLog.AddLine(unit.GetName() + " se quema: " + std::to_string(burnDamage) + " de daño por Burn.");
+        timeline.AddHit(unit, burnDamage, false);
+        timeline.AddLogLine(unit.GetName() + " se quema: " + std::to_string(burnDamage) + " de daño por Burn.");
 
         // La quemada tambien puede romper un umbral de Stagger
         if (unit.ConsumeStaggerEvent())
         {
-            combatLog.AddLine("¡" + unit.GetName() + " queda staggereado por la quemadura! No actúa el próximo turno.");
+            timeline.AddBanner("¡STAGGER!");
+            timeline.AddLogLine("¡" + unit.GetName() + " queda staggereado por la quemadura! No actúa el próximo turno.");
         }
     }
 
@@ -576,6 +852,17 @@ namespace ReyesCuadra
         // Si se acaba de cerrar un cartel, este clic es el segundo de un doble clic: se ignora
         if (clickCooldownClock.getElapsedTime() < sf::seconds(CLICK_COOLDOWN_SECONDS))
         {
+            return;
+        }
+
+        // Mientras se muestra la pelea, el boton de Combatir funciona como "Saltear"
+        if (state == GameState::PlayingTurn)
+        {
+            if (fightButton.Contains(clickPosition))
+            {
+                FinishPlayback();
+            }
+
             return;
         }
 
@@ -617,13 +904,20 @@ namespace ReyesCuadra
             }
         }
 
-        // Clic en una skill: se la pone al slot seleccionado y pasa solo al siguiente slot
+        // Clic en una skill: se la pone a la columna seleccionada (si todavia quedan acciones libres)
         for (size_t buttonIndex = 0; buttonIndex < skillButtons.size(); buttonIndex++)
         {
             if (skillButtons[buttonIndex].IsEnabled() && skillButtons[buttonIndex].Contains(clickPosition))
             {
+                const bool columnHasAction = playerActions[static_cast<size_t>(selectedSlot)] != nullptr;
+
+                if (!columnHasAction && CountPlayerActions() >= PLAYER_MAX_ACTIONS)
+                {
+                    combatLog.AddLine("Ya usaste tus 3 acciones: hacé clic derecho en una para sacarla y ponerla en otra columna.");
+                    return;
+                }
+
                 playerActions[static_cast<size_t>(selectedSlot)] = &playerSkills[buttonIndex];
-                selectedSlot = (selectedSlot + 1) % SLOT_COUNT;
                 UpdateWinChances();
                 return;
             }
@@ -639,6 +933,26 @@ namespace ReyesCuadra
         }
     }
 
+    void Gameplay::HandleRightClick(sf::Vector2f clickPosition)
+    {
+        if (state != GameState::ChoosingSkills || isShowingHelp || player.IsStaggered())
+        {
+            return;
+        }
+
+        // Clic derecho en una columna de Yi Sang: se saca la accion y queda libre para ponerla en otra
+        for (int slotIndex = 0; slotIndex < SLOT_COUNT; slotIndex++)
+        {
+            if (GetSlotBounds(slotIndex, true).contains(clickPosition))
+            {
+                playerActions[static_cast<size_t>(slotIndex)] = nullptr;
+                selectedSlot = slotIndex;
+                UpdateWinChances();
+                return;
+            }
+        }
+    }
+
     sf::FloatRect Gameplay::GetSlotBounds(int slotIndex, bool isPlayerRow) const
     {
         const float slotX = SLOTS_LEFT + static_cast<float>(slotIndex) * (SLOT_WIDTH + SLOT_GAP);
@@ -649,8 +963,8 @@ namespace ReyesCuadra
 
     void Gameplay::DrawUnitPanels(sf::RenderWindow& window) const
     {
-        DrawUnitPanel(window, font, player, false);
-        DrawUnitPanel(window, font, enemy, true);
+        DrawUnitPanel(window, font, player, false, shownPlayerHp);
+        DrawUnitPanel(window, font, enemy, true, shownEnemyHp);
 
         // Numero de turno en el medio de la pantalla
         const sf::FloatRect turnArea({ 0.0f, TURN_LABEL_Y }, { SCREEN_WIDTH, static_cast<float>(TURN_SIZE) });
@@ -663,7 +977,15 @@ namespace ReyesCuadra
         {
             // Fila de arriba: lo que hace Lei Heng (puede tener menos acciones que slots, por ejemplo en el turno del ataque fuerte)
             const Skill* enemySkill = (slotIndex < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(slotIndex)] : nullptr;
-            const sf::FloatRect enemyBounds = GetSlotBounds(slotIndex, false);
+            sf::FloatRect enemyBounds = GetSlotBounds(slotIndex, false);
+
+            // La tarjeta que recibio un golpe se sacude un ratito
+            const float shakeOffset = (shakeTimeLeft > 0.0f) ? std::sin(shakeTimeLeft * SHAKE_FREQUENCY) * SHAKE_DISTANCE : 0.0f;
+
+            if (slotIndex == shakeColumn && !shakeIsPlayerRow)
+            {
+                enemyBounds.position.x += shakeOffset;
+            }
 
             DrawSlotCard(window, enemyBounds, enemySkill, ENEMY_SLOT_COLOR, false, enemy.IsStaggered() ? "Staggereado" : "Sin acción");
 
@@ -671,19 +993,31 @@ namespace ReyesCuadra
             DrawClashPreview(window, slotIndex, previewArea);
 
             // Fila de abajo: lo que eligio el jugador para Yi Sang
-            const sf::FloatRect playerBounds = GetSlotBounds(slotIndex, true);
+            sf::FloatRect playerBounds = GetSlotBounds(slotIndex, true);
+
+            if (slotIndex == shakeColumn && shakeIsPlayerRow)
+            {
+                playerBounds.position.x += shakeOffset;
+            }
+
             const bool isHighlighted = (state == GameState::ChoosingSkills) && !player.IsStaggered() && (slotIndex == selectedSlot || playerBounds.contains(mousePosition));
 
-            DrawSlotCard(window, playerBounds, playerActions[static_cast<size_t>(slotIndex)], PLAYER_SLOT_COLOR, isHighlighted, player.IsStaggered() ? "Staggereado" : "Sin acción");
+            DrawSlotCard(window, playerBounds, playerActions[static_cast<size_t>(slotIndex)], PLAYER_SLOT_COLOR, isHighlighted, player.IsStaggered() ? "Staggereado" : "Libre");
         }
 
-        if (player.IsStaggered())
+        if (state == GameState::PlayingTurn)
+        {
+            DrawTextAt(window, font, "Mirá cómo se resuelve el turno... (Saltear lo termina de una)", HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
+        }
+        else if (player.IsStaggered())
         {
             DrawTextAt(window, font, "Yi Sang está staggereado: este turno no puede actuar. Apretá ¡Combatir! para seguir.", HINT_SIZE, { SLOTS_LEFT, HINT_Y }, STAGGER_COLOR);
         }
         else
         {
-            DrawTextAt(window, font, "Clic en un slot de Yi Sang y después en una skill. El % entre las filas es tu chance de ganar ese clash.", HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
+            const std::string hint = "Acciones: " + std::to_string(CountPlayerActions()) + "/" + std::to_string(PLAYER_MAX_ACTIONS) + "  ·  Clic en una columna y después en una skill  ·  Clic derecho la saca  ·  Sin acción = te pegan directo";
+
+            DrawTextAt(window, font, hint, HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
         }
     }
 
@@ -744,6 +1078,13 @@ namespace ReyesCuadra
             }
 
             DrawTextCentered(window, font, label, VS_SIZE, area, DIM_TEXT_COLOR);
+            return;
+        }
+
+        // Columna que cubre la esquiva activa: se muestra la chance de esquivar todos los golpes
+        if (columnCoveredByEvade[static_cast<size_t>(slotIndex)])
+        {
+            DrawTextCentered(window, font, "Esquiva: " + FormatPercent(winChance), VS_SIZE, area, GetChanceColor(winChance));
             return;
         }
 
@@ -823,6 +1164,62 @@ namespace ReyesCuadra
                 lineY += TOOLTIP_LINE_HEIGHT;
             }
         }
+    }
+
+    void Gameplay::DrawActiveColumn(sf::RenderWindow& window) const
+    {
+        if (state != GameState::PlayingTurn || activeColumn == NO_COLUMN)
+        {
+            return;
+        }
+
+        // Rectangulo dorado detras de las dos tarjetas de la columna que se esta resolviendo
+        const sf::FloatRect enemyBounds = GetSlotBounds(activeColumn, false);
+        const float top = enemyBounds.position.y - ACTIVE_COLUMN_PADDING;
+        const float bottom = PLAYER_ROW_Y + SLOT_HEIGHT + ACTIVE_COLUMN_PADDING;
+
+        sf::RectangleShape highlight({ SLOT_WIDTH + ACTIVE_COLUMN_PADDING * 2.0f, bottom - top });
+        highlight.setPosition({ enemyBounds.position.x - ACTIVE_COLUMN_PADDING, top });
+        highlight.setFillColor(ACTIVE_COLUMN_COLOR);
+        highlight.setOutlineColor(GOLD_COLOR);
+        highlight.setOutlineThickness(SLOT_BORDER_THICKNESS);
+        window.draw(highlight);
+    }
+
+    void Gameplay::DrawFloatingTexts(sf::RenderWindow& window) const
+    {
+        for (const FloatingText& floatingText : floatingTexts)
+        {
+            // Se va haciendo transparente a medida que se le acaba el tiempo
+            sf::Color color = floatingText.color;
+            const float alpha = floatingText.timeLeft / FLOATING_TEXT_DURATION;
+            color.a = static_cast<std::uint8_t>(255.0f * ((alpha > 1.0f) ? 1.0f : alpha));
+
+            const bool isCritical = !floatingText.text.empty() && floatingText.text.back() == '!';
+            const unsigned int size = isCritical ? CRITICAL_TEXT_SIZE : FLOATING_TEXT_SIZE;
+            const sf::FloatRect area({ floatingText.position.x - SLOT_WIDTH / 2.0f, floatingText.position.y }, { SLOT_WIDTH, static_cast<float>(size) });
+
+            DrawTextCentered(window, font, floatingText.text, size, area, color);
+        }
+    }
+
+    void Gameplay::DrawBanner(sf::RenderWindow& window) const
+    {
+        if (bannerTimeLeft <= 0.0f)
+        {
+            return;
+        }
+
+        // Franja oscura con el texto grande en el medio de las columnas
+        sf::RectangleShape band({ SCREEN_WIDTH, BANNER_HEIGHT });
+        band.setPosition({ 0.0f, BANNER_CENTER_Y - BANNER_HEIGHT / 2.0f });
+        band.setFillColor(BANNER_BACKGROUND);
+        window.draw(band);
+
+        const sf::FloatRect area({ 0.0f, BANNER_CENTER_Y - BANNER_HEIGHT / 2.0f }, { SCREEN_WIDTH, BANNER_HEIGHT });
+        const bool isStagger = bannerText.find("STAGGER") != std::string::npos;
+
+        DrawTextCentered(window, font, bannerText, BANNER_TEXT_SIZE, area, isStagger ? STAGGER_COLOR : GOLD_COLOR);
     }
 
     void Gameplay::DrawGameOver(sf::RenderWindow& window) const
@@ -921,7 +1318,7 @@ namespace ReyesCuadra
         return std::to_string(percent) + "%";
     }
 
-    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide)
+    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp)
     {
         // Por ahora cada personaje es un cuadrado de color; despues se puede cambiar por un sprite
         const float portraitX = isRightSide ? SCREEN_WIDTH - MARGIN - PORTRAIT_SIZE : MARGIN;
@@ -953,7 +1350,9 @@ namespace ReyesCuadra
         barBackground.setOutlineThickness(SLOT_BORDER_THICKNESS);
         window.draw(barBackground);
 
-        sf::RectangleShape barFill({ HP_BAR_WIDTH * unit.GetHpRatio(), HP_BAR_HEIGHT });
+        const float shownRatio = shownHp / static_cast<float>(unit.GetMaxHp());
+
+        sf::RectangleShape barFill({ HP_BAR_WIDTH * shownRatio, HP_BAR_HEIGHT });
         barFill.setPosition({ barX, barY });
         barFill.setFillColor(HP_BAR_FILL);
         window.draw(barFill);
@@ -969,7 +1368,7 @@ namespace ReyesCuadra
             window.draw(mark);
         }
 
-        const std::string hpText = std::to_string(unit.GetHp()) + " / " + std::to_string(unit.GetMaxHp());
+        const std::string hpText = std::to_string(static_cast<int>(std::round(shownHp))) + " / " + std::to_string(unit.GetMaxHp());
         DrawTextCentered(window, font, hpText, HP_TEXT_SIZE, sf::FloatRect({ barX, barY }, { HP_BAR_WIDTH, HP_BAR_HEIGHT }), TEXT_COLOR);
 
         // Abajo de la barra se muestra la cordura y los estados que tenga (Poise y Sinking), en una sola linea

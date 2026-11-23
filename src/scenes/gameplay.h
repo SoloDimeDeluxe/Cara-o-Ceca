@@ -7,6 +7,7 @@
 
 #include <SFML/Graphics.hpp>
 
+#include "combat/combat_timeline.h"
 #include "combat/enemy_pattern.h"
 #include "combat/skill.h"
 #include "combat/unit.h"
@@ -15,15 +16,28 @@
 
 namespace ReyesCuadra
 {
-    // Cantidad de slots por turno (Yi Sang tiene los mismos que Lei Heng)
+    // Cantidad de columnas por turno: Lei Heng usa hasta 6 acciones, una por columna
     const int SLOT_COUNT = 6;
+
+    // Cantidad de acciones de Yi Sang por turno: las pone en las columnas que quiera frenar
+    const int PLAYER_MAX_ACTIONS = 3;
 
     // En que parte de la partida estamos
     enum class GameState
     {
         ChoosingSkills,
+        PlayingTurn,    // se esta mostrando la pelea del turno, paso a paso
         Victory,
         Defeat
+    };
+
+    // Numero de dano que sale flotando sobre una tarjeta cuando alguien recibe un golpe
+    struct FloatingText
+    {
+        std::string text;
+        sf::Vector2f position;
+        sf::Color color;
+        float timeLeft;
     };
 
     // Escena del combate: Yi Sang contra Lei Heng, por turnos
@@ -38,6 +52,9 @@ namespace ReyesCuadra
 
         // Recibe los eventos de la ventana (movimiento y clics del mouse)
         void HandleEvent(const sf::Event& event);
+
+        // Avanza las animaciones (la pelea paso a paso, los numeros flotantes, las barras de vida)
+        void Update(float deltaSeconds);
 
         // Dibuja todo el combate
         void Draw(sf::RenderWindow& window) const;
@@ -56,14 +73,29 @@ namespace ReyesCuadra
         // asi el jugador compara antes de elegir (como en Limbus)
         void UpdateSkillButtonChances();
 
-        // Hace los clashes de todas las columnas y despues se fija si alguien murio
+        // Resuelve todos los clashes del turno de una (la logica) y arranca a mostrarlos de a poco
         void ResolveTurn();
+
+        // Cantidad de acciones que Yi Sang tiene puestas este turno
+        int CountPlayerActions() const;
+
+        // Muestra el siguiente paso de la pelea (un golpe, un cartel, una linea del registro...)
+        void PlayEvent(const CombatEvent& event);
+
+        // Termina de mostrar la pelea: si se apreto Saltear, muestra todo lo que faltaba de una
+        void FinishPlayback();
+
+        // Tarjeta (y fila) donde aparece un golpe: la del que lo recibe en esa columna
+        sf::Vector2f GetHitPosition(const CombatEvent& event) const;
 
         // Al final del turno, la unidad recibe el dano de su Burn (y se avisa en el registro)
         void ApplyBurnAtTurnEnd(Unit& unit);
 
         // Reacciona a un clic izquierdo segun lo que haya debajo del mouse
         void HandleClick(sf::Vector2f clickPosition);
+
+        // Clic derecho: saca la accion de Yi Sang de esa columna
+        void HandleRightClick(sf::Vector2f clickPosition);
 
         // Rectangulo de la tarjeta de un slot (de Yi Sang o de Lei Heng)
         sf::FloatRect GetSlotBounds(int slotIndex, bool isPlayerRow) const;
@@ -88,6 +120,11 @@ namespace ReyesCuadra
         // Dibuja el cartel con el titulo, los numeros y los efectos de una skill
         void DrawSkillDetails(sf::RenderWindow& window, const Skill& skill, const std::string& title) const;
 
+        // Animaciones de la pelea: columna activa, numeros flotantes y carteles grandes
+        void DrawActiveColumn(sf::RenderWindow& window) const;
+        void DrawFloatingTexts(sf::RenderWindow& window) const;
+        void DrawBanner(sf::RenderWindow& window) const;
+
         const sf::Font& font;
 
         Unit player;
@@ -101,7 +138,6 @@ namespace ReyesCuadra
         Skill tripleSlash;
         Skill explosiveSlash;
         Skill tangleCutter;
-        Skill tigerslayerFlurry;
         Skill tiantuiReload;
 
         EnemyPattern enemyPattern;
@@ -112,6 +148,9 @@ namespace ReyesCuadra
 
         // Chance de ganar el clash de cada columna (0 a 1). Un valor negativo significa que en esa columna no hay clash.
         std::array<float, SLOT_COUNT> winChances;
+
+        // true en las columnas sin accion de Yi Sang que cubriria una esquiva activa de una columna anterior
+        std::array<bool, SLOT_COUNT> columnCoveredByEvade;
 
         std::vector<Button> skillButtons;
         Button fightButton;
@@ -128,6 +167,35 @@ namespace ReyesCuadra
         int turn;
         int selectedSlot;
         sf::Vector2f mousePosition;
+
+        // ---------- Pelea paso a paso ----------
+
+        // Todo lo que paso en el turno, en orden, y por cual paso vamos
+        CombatTimeline timeline;
+        size_t nextEventIndex;
+        float eventTimer;
+
+        // Como queda la partida cuando termina de mostrarse el turno (sigue, victoria o derrota)
+        GameState stateAfterPlayback;
+
+        // Columna que se esta mostrando (-1 = ninguna)
+        int activeColumn;
+
+        // Vida que se ve en las barras: baja de a poco hasta la vida "real" de ese momento de la pelea
+        float shownPlayerHp;
+        float shownEnemyHp;
+        float targetPlayerHp;
+        float targetEnemyHp;
+
+        std::vector<FloatingText> floatingTexts;
+
+        std::string bannerText;
+        float bannerTimeLeft;
+
+        // Tarjeta que se sacude cuando recibe un golpe
+        int shakeColumn;
+        bool shakeIsPlayerRow;
+        float shakeTimeLeft;
     };
 }
 
