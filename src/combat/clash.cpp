@@ -284,13 +284,25 @@ namespace ReyesCuadra
             target.GetTremor().AddCount(count);
         }
 
-        // El Burst va despues de poner el Tremor de esta moneda
-        if (effect.burst || (effect.burstOnlyInClash && isFromClash))
+        // El Burst va despues de poner el Tremor de esta moneda, y solo si se cumplen sus condiciones
+        const bool clashConditionMet = !effect.burstOnlyInClash || isFromClash;
+        const bool crackingConditionMet = !effect.burstOnlyWithoutCracking || !DidHitCrack();
+        int totalRaise = 0;
+
+        if (effect.burstTimes > 0 && clashConditionMet && crackingConditionMet)
         {
-            return target.TriggerTremorBurst();
+            for (int burstIndex = 0; burstIndex < effect.burstTimes; burstIndex++)
+            {
+                totalRaise += target.TriggerTremorBurst();
+            }
+
+            for (int lossIndex = 0; lossIndex < effect.countLossAfterBurst; lossIndex++)
+            {
+                target.GetTremor().LoseOneCount();
+            }
         }
 
-        return 0;
+        return totalRaise;
     }
 
     static void ApplyOnHitSinking(const Skill& skill, Unit& target)

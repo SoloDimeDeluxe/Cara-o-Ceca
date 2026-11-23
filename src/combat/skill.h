@@ -58,9 +58,15 @@ namespace ReyesCuadra
         int clashOnlyPotency = 0;
         int clashOnlyCount = 0;
 
-        // [Al golpear]: hace Tremor Burst al objetivo (siempre, o solo si el golpe viene de un clash)
-        bool burst = false;
+        // [Al golpear]: cuantas veces le hace Tremor Burst al objetivo (0 = ninguna)
+        int burstTimes = 0;
+
+        // Condiciones para el Burst: que el golpe venga de un clash y/o que el golpe no haga "Cracking"
         bool burstOnlyInClash = false;
+        bool burstOnlyWithoutCracking = false;
+
+        // Cantidad de Tremor que le saca al objetivo despues de los Burst
+        int countLossAfterBurst = 0;
     };
 
     // Efectos de Tremor de una skill

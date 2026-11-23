@@ -170,13 +170,33 @@ namespace ReyesCuadra
                 lines.push_back(coinPrefix + "[Al golpear en un clash] Inflige " + DescribeStatusAmount(coinEffect.clashOnlyPotency, coinEffect.clashOnlyCount) + " de Tremor");
             }
 
-            if (coinEffect.burst)
+            if (coinEffect.burstTimes > 0)
             {
-                lines.push_back(coinPrefix + "[Al golpear] Tremor Burst (y le saca 1 de cantidad de Tremor)");
-            }
-            else if (coinEffect.burstOnlyInClash)
-            {
-                lines.push_back(coinPrefix + "[Al golpear en un clash] Tremor Burst (y le saca 1 de cantidad de Tremor)");
+                std::string condition = "[Al golpear";
+
+                if (coinEffect.burstOnlyInClash)
+                {
+                    condition += " en un clash";
+                }
+
+                if (coinEffect.burstOnlyWithoutCracking)
+                {
+                    condition += " sin Cracking";
+                }
+
+                std::string line = coinPrefix + condition + "] Tremor Burst";
+
+                if (coinEffect.burstTimes > 1)
+                {
+                    line += " " + std::to_string(coinEffect.burstTimes) + " veces";
+                }
+
+                if (coinEffect.countLossAfterBurst > 0)
+                {
+                    line += "; después le saca " + std::to_string(coinEffect.countLossAfterBurst) + " de cantidad de Tremor";
+                }
+
+                lines.push_back(line);
             }
         }
 

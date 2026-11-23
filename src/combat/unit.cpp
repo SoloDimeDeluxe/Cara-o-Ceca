@@ -216,8 +216,6 @@ namespace ReyesCuadra
             nextThreshold = MAX_THRESHOLD;
         }
 
-        tremor.LoseOneCount();
-
         // Si la vida quedo por debajo del umbral nuevo, se staggerea ahora mismo
         if (!IsDead())
         {

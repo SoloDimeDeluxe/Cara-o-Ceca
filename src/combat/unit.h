@@ -74,7 +74,7 @@ namespace ReyesCuadra
         const Tremor& GetTremor() const;
 
         // "Tremor Burst": sube el proximo umbral de Stagger tantos puntos de porcentaje como la potencia de Tremor
-        // (por ejemplo, con 10 de potencia el umbral pasa de 50% a 60%) y saca 1 de cantidad de Tremor.
+        // (por ejemplo, con 10 de potencia el umbral pasa de 50% a 60%). No gasta cantidad: eso lo decide cada skill.
         // Si la vida queda por debajo del umbral nuevo, la unidad queda staggereada.
         // Devuelve cuantos puntos subio el umbral (0 si no tenia Tremor o ya no le quedaban umbrales).
         int TriggerTremorBurst();

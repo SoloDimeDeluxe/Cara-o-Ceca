@@ -149,7 +149,7 @@ namespace ReyesCuadra
         "7. Sinking: las skills de Yi Sang se lo ponen a Lei Heng. Cada vez que lo golpean pierde cordura igual a la potencia (si ya está en -45, pierde vida) y la cantidad baja 1.",
         "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos (también las de Lei Heng).",
         "9. Stagger: las marcas en las barras de vida son umbrales. Si la vida baja de uno, esa unidad queda staggereada: pierde lo que le quedaba del turno, no actúa el turno siguiente y mientras tanto recibe el doble de daño.",
-        "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang. Por ahora solo se acumula y la cantidad baja 1 al final de cada turno; más adelante va a acercar tu umbral de Stagger."
+        "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang y la cantidad baja 1 al final de cada turno. El Triple Corte hace Tremor Burst: tu próximo umbral de Stagger sube tantos puntos como la potencia de Tremor, así te staggerea antes."
     };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
@@ -267,7 +267,7 @@ namespace ReyesCuadra
         }
 
         // Tremor que inflige cada skill de Lei Heng, moneda por moneda (sacado de los datos del juego).
-        // Por ahora solo el Tremor comun: sin Tremor Burst, sin variantes y sin bonus de poder por Tremor.
+        // Por ahora solo el Tremor comun y el Tremor Burst del Triple Corte: sin variantes y sin bonus de poder por Tremor.
         // Doble Corte y Triple Corte son sus versiones "Explosion"
         TremorEffects doubleSlashTremor;
         doubleSlashTremor.perCoin.resize(2);
@@ -277,10 +277,13 @@ namespace ReyesCuadra
         doubleSlash.SetTremorEffects(doubleSlashTremor);
 
         TremorEffects tripleSlashTremor;
-        tripleSlashTremor.perCoin.resize(2);
+        tripleSlashTremor.perCoin.resize(3);
         tripleSlashTremor.perCoin[0].count = 2;
         tripleSlashTremor.perCoin[1].potency = 2;
         tripleSlashTremor.perCoin[1].count = 2;
+        tripleSlashTremor.perCoin[2].burstTimes = 2;
+        tripleSlashTremor.perCoin[2].burstOnlyWithoutCracking = true;
+        tripleSlashTremor.perCoin[2].countLossAfterBurst = 2;
         tripleSlash.SetTremorEffects(tripleSlashTremor);
 
         TremorEffects explosiveSlashTremor;
