@@ -98,6 +98,16 @@ namespace ReyesCuadra
         sinkingEffects = effects;
     }
 
+    const TremorEffects& Skill::GetTremorEffects() const
+    {
+        return tremorEffects;
+    }
+
+    void Skill::SetTremorEffects(const TremorEffects& effects)
+    {
+        tremorEffects = effects;
+    }
+
     std::vector<std::string> Skill::GetEffectLines() const
     {
         std::vector<std::string> lines;
@@ -132,6 +142,42 @@ namespace ReyesCuadra
         if (poiseEffects.gainsCoinPowerFromPoise)
         {
             lines.push_back("Poder de moneda +1 cada 6 de (Poise propio + Sinking del objetivo), máximo +2");
+        }
+
+        // Tremor (sobre el objetivo), moneda por moneda
+        if (tremorEffects.tremorPerBasePower > 0)
+        {
+            lines.push_back("Poder base +1 cada " + std::to_string(tremorEffects.tremorPerBasePower) + " de Tremor del objetivo, máximo +" + std::to_string(tremorEffects.maxBasePowerBonus));
+        }
+
+        if (tremorEffects.tremorPerCoinPower > 0)
+        {
+            lines.push_back("Poder de moneda +1 cada " + std::to_string(tremorEffects.tremorPerCoinPower) + " de Tremor del objetivo, máximo +" + std::to_string(tremorEffects.maxCoinPowerBonus));
+        }
+
+        for (size_t coinIndex = 0; coinIndex < tremorEffects.perCoin.size(); coinIndex++)
+        {
+            const CoinTremorEffect& coinEffect = tremorEffects.perCoin[coinIndex];
+            const std::string coinPrefix = "Moneda " + std::to_string(coinIndex + 1) + ": ";
+
+            if (coinEffect.potency > 0 || coinEffect.count > 0)
+            {
+                lines.push_back(coinPrefix + "[Al golpear] Inflige " + DescribeStatusAmount(coinEffect.potency, coinEffect.count) + " de Tremor");
+            }
+
+            if (coinEffect.clashOnlyPotency > 0 || coinEffect.clashOnlyCount > 0)
+            {
+                lines.push_back(coinPrefix + "[Al golpear en un clash] Inflige " + DescribeStatusAmount(coinEffect.clashOnlyPotency, coinEffect.clashOnlyCount) + " de Tremor");
+            }
+
+            if (coinEffect.burst)
+            {
+                lines.push_back(coinPrefix + "[Al golpear] Tremor Burst (y le saca 1 de cantidad de Tremor)");
+            }
+            else if (coinEffect.burstOnlyInClash)
+            {
+                lines.push_back(coinPrefix + "[Al golpear en un clash] Tremor Burst (y le saca 1 de cantidad de Tremor)");
+            }
         }
 
         return lines;

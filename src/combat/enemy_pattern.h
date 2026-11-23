@@ -8,8 +8,8 @@
 namespace ReyesCuadra
 {
     // Patron fijo de Lei Heng: decide que skills usa en cada turno
-    //   Turnos 1 y 2: 2 Triple corte + 4 Doble corte
-    //   Despues se repite: 2 turnos de (1 Tajo Destrozador Explosivo + 2 Triple corte + 3 Doble corte) y 1 turno de Cortador de enredos
+    //   Turnos 1 y 2: 2 Triple Corte - Explosion + 4 Doble Corte - Explosion
+    //   Despues se repite: 2 turnos de (1 Tajo Destrozador Explosivo + 2 Triple Corte + 3 Doble Corte) y 1 turno de Cortador de enredos
     //   Con 40% de vida o menos, el Cortador de enredos se cambia por la Rafaga Savage Tigerslayer
     class EnemyPattern
     {

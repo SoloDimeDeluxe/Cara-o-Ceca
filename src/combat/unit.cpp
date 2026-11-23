@@ -11,6 +11,10 @@ namespace ReyesCuadra
     // (el del turno en que quedo staggereada y el del turno que se pierde)
     static const int STAGGER_TURN_ENDS = 2;
 
+    // Cada punto de potencia de Tremor sube el umbral de Stagger un 1% de la vida maxima (y nunca pasa del 100%)
+    static const float THRESHOLD_RAISE_PER_TREMOR = 0.01f;
+    static const float MAX_THRESHOLD = 1.0f;
+
     // La chance de cara es 50% + 1% por cada punto de cordura
     static const float BASE_HEADS_CHANCE = 0.5f;
     static const float HEADS_CHANCE_PER_SANITY = 0.01f;
@@ -61,6 +65,11 @@ namespace ReyesCuadra
             hp = 0;
         }
 
+        CheckStaggerThresholds();
+    }
+
+    void Unit::CheckStaggerThresholds()
+    {
         // Se rompen todos los umbrales que la vida haya pasado. Aunque caigan varios de una, es un solo Stagger.
         bool brokeThreshold = false;
 
@@ -95,6 +104,7 @@ namespace ReyesCuadra
             }
         }
 
+        originalStaggerThresholds = staggerThresholds;
         brokenThresholds = 0;
     }
 
@@ -178,6 +188,45 @@ namespace ReyesCuadra
         return BASE_HEADS_CHANCE + static_cast<float>(sanity) * HEADS_CHANCE_PER_SANITY;
     }
 
+    Tremor& Unit::GetTremor()
+    {
+        return tremor;
+    }
+
+    const Tremor& Unit::GetTremor() const
+    {
+        return tremor;
+    }
+
+    int Unit::TriggerTremorBurst()
+    {
+        // Sin Tremor, o sin umbrales sin romper, el Burst no hace nada
+        if (!tremor.IsActive() || brokenThresholds >= staggerThresholds.size())
+        {
+            return 0;
+        }
+
+        const int raise = tremor.GetPotency();
+        float& nextThreshold = staggerThresholds[brokenThresholds];
+
+        nextThreshold += static_cast<float>(raise) * THRESHOLD_RAISE_PER_TREMOR;
+
+        if (nextThreshold > MAX_THRESHOLD)
+        {
+            nextThreshold = MAX_THRESHOLD;
+        }
+
+        tremor.LoseOneCount();
+
+        // Si la vida quedo por debajo del umbral nuevo, se staggerea ahora mismo
+        if (!IsDead())
+        {
+            CheckStaggerThresholds();
+        }
+
+        return raise;
+    }
+
     Sinking& Unit::GetSinking()
     {
         return sinking;
@@ -197,5 +246,7 @@ namespace ReyesCuadra
         hasPendingStaggerEvent = false;
         poise.Clear();
         sinking.Clear();
+        tremor.Clear();
+        staggerThresholds = originalStaggerThresholds;
     }
 }

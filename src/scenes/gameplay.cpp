@@ -147,8 +147,9 @@ namespace ReyesCuadra
         "5. Esquivar no es un clash: tirás una sola vez y cada golpe de Lei Heng que no supere tu número no te hace daño. Ahí el % es tu chance de esquivar todos los golpes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda un clash.",
         "6. Poise: las skills de Yi Sang lo van cargando. Cada punto de potencia da 5% de chance de crítico (+20% de daño) y cada 6 de potencia suman +1 al poder de cada moneda. La cantidad baja 1 por crítico y 1 al final del turno; si llega a 0, se pierde.",
         "7. Sinking: las skills de Yi Sang se lo ponen a Lei Heng. Cada vez que lo golpean pierde cordura igual a la potencia (si ya está en -45, pierde vida) y la cantidad baja 1.",
-        "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos.",
-        "9. Stagger: las marcas en las barras de vida son umbrales. Si la vida baja de uno, esa unidad queda staggereada: pierde lo que le quedaba del turno, no actúa el turno siguiente y mientras tanto recibe el doble de daño."
+        "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos (también las de Lei Heng).",
+        "9. Stagger: las marcas en las barras de vida son umbrales. Si la vida baja de uno, esa unidad queda staggereada: pierde lo que le quedaba del turno, no actúa el turno siguiente y mientras tanto recibe el doble de daño.",
+        "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang. Por ahora solo se acumula y la cantidad baja 1 al final de cada turno; más adelante va a acercar tu umbral de Stagger."
     };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
@@ -167,8 +168,8 @@ namespace ReyesCuadra
         : font(gameFont)
         , player(PLAYER_NAME, PLAYER_MAX_HP, PLAYER_COLOR)
         , enemy(ENEMY_NAME, ENEMY_MAX_HP, ENEMY_COLOR)
-        , doubleSlash("Doble corte", "Doble corte", SkillType::Attack, 4, 2, 2, false)
-        , tripleSlash("Triple corte", "Triple corte", SkillType::Attack, 3, 3, 2, false)
+        , doubleSlash("Doble Corte - Explosión", "Doble Corte - Explosión", SkillType::Attack, 4, 2, 3, false)
+        , tripleSlash("Triple Corte - Explosión", "Triple Corte - Explosión", SkillType::Attack, 3, 3, 3, false)
         , explosiveSlash("Tajo Destrozador Explosivo", "Tajo Destrozador Explosivo", SkillType::Attack, 4, 3, 3, true)
         , tangleCutter("Cortador de enredos", "Cortador de enredos", SkillType::Attack, 8, 1, 12, true)
         , tigerslayerFlurry("Ráfaga de espadas perfeccionada marca Savage Tigerslayer", "Ráfaga Savage Tigerslayer", SkillType::Attack, 3, 6, 3, true)
@@ -264,6 +265,37 @@ namespace ReyesCuadra
             skillButtons.push_back(Button(gameFont, sf::FloatRect({ MARGIN, buttonY }, { SKILL_BUTTON_WIDTH, SKILL_BUTTON_HEIGHT }), label, subLabel));
             skillButtons.back().SetEnabled(!skill.IsLocked());
         }
+
+        // Tremor que inflige cada skill de Lei Heng, moneda por moneda (sacado de los datos del juego).
+        // Por ahora solo el Tremor comun: sin Tremor Burst, sin variantes y sin bonus de poder por Tremor.
+        // Doble Corte y Triple Corte son sus versiones "Explosion"
+        TremorEffects doubleSlashTremor;
+        doubleSlashTremor.perCoin.resize(2);
+        doubleSlashTremor.perCoin[0].potency = 3;
+        doubleSlashTremor.perCoin[1].potency = 3;
+        doubleSlashTremor.perCoin[1].count = 2;
+        doubleSlash.SetTremorEffects(doubleSlashTremor);
+
+        TremorEffects tripleSlashTremor;
+        tripleSlashTremor.perCoin.resize(2);
+        tripleSlashTremor.perCoin[0].count = 2;
+        tripleSlashTremor.perCoin[1].potency = 2;
+        tripleSlashTremor.perCoin[1].count = 2;
+        tripleSlash.SetTremorEffects(tripleSlashTremor);
+
+        TremorEffects explosiveSlashTremor;
+        explosiveSlashTremor.perCoin.resize(2);
+        explosiveSlashTremor.perCoin[0].potency = 3;
+        explosiveSlashTremor.perCoin[0].clashOnlyPotency = 4;
+        explosiveSlashTremor.perCoin[0].clashOnlyCount = 4;
+        explosiveSlashTremor.perCoin[1].count = 3;
+        explosiveSlash.SetTremorEffects(explosiveSlashTremor);
+
+        TremorEffects tigerslayerTremor;
+        tigerslayerTremor.perCoin.resize(4);
+        tigerslayerTremor.perCoin[2].potency = 6;
+        tigerslayerTremor.perCoin[3].count = 6;
+        tigerslayerFlurry.SetTremorEffects(tigerslayerTremor);
 
         StartNewGame();
     }
@@ -425,9 +457,11 @@ namespace ReyesCuadra
             }
         }
 
-        // Al final del turno, la cantidad de Poise baja 1 y los staggereados avanzan su recuperacion
+        // Al final del turno, la cantidad de Poise y de Tremor baja 1 y los staggereados avanzan su recuperacion
         player.GetPoise().OnTurnEnd();
         enemy.GetPoise().OnTurnEnd();
+        player.GetTremor().OnTurnEnd();
+        enemy.GetTremor().OnTurnEnd();
 
         if (player.UpdateStaggerOnTurnEnd())
         {
@@ -645,55 +679,68 @@ namespace ReyesCuadra
 
     void Gameplay::DrawSkillTooltip(sf::RenderWindow& window) const
     {
+        // Skills de Yi Sang (botones de la lista)
         for (size_t skillIndex = 0; skillIndex < skillButtons.size(); skillIndex++)
         {
-            if (!skillButtons[skillIndex].Contains(mousePosition))
+            if (skillButtons[skillIndex].Contains(mousePosition))
             {
-                continue;
+                const std::string title = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + playerSkills[skillIndex].GetName();
+
+                DrawSkillDetails(window, playerSkills[skillIndex], title);
+                return;
             }
+        }
 
-            const Skill& skill = playerSkills[skillIndex];
+        // Skills de Lei Heng (tarjetas de la fila de arriba), asi se sabe que te va a hacer
+        for (int slotIndex = 0; slotIndex < static_cast<int>(enemyActions.size()) && slotIndex < SLOT_COUNT; slotIndex++)
+        {
+            const Skill* enemySkill = enemyActions[static_cast<size_t>(slotIndex)];
 
-            // El cartel tapa el registro de combate mientras el mouse este sobre la skill
-            sf::RectangleShape panel(COMBAT_LOG_AREA.size);
-            panel.setPosition(COMBAT_LOG_AREA.position);
-            panel.setFillColor(GAME_OVER_BOX_COLOR);
-            panel.setOutlineColor(GOLD_COLOR);
-            panel.setOutlineThickness(SLOT_BORDER_THICKNESS);
-            window.draw(panel);
-
-            const float textX = COMBAT_LOG_AREA.position.x + TOOLTIP_PADDING;
-            const float textWidth = COMBAT_LOG_AREA.size.x - TOOLTIP_PADDING * 2.0f;
-            float lineY = COMBAT_LOG_AREA.position.y + TOOLTIP_PADDING / 2.0f;
-
-            const std::string title = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + skill.GetName();
-
-            for (const std::string& line : WrapText(font, title, TOOLTIP_TITLE_SIZE, textWidth))
+            if (enemySkill != nullptr && GetSlotBounds(slotIndex, false).contains(mousePosition))
             {
-                DrawTextAt(window, font, line, TOOLTIP_TITLE_SIZE, { textX, lineY }, GOLD_COLOR);
-                lineY += TOOLTIP_TITLE_LINE_HEIGHT;
+                DrawSkillDetails(window, *enemySkill, std::string(ENEMY_NAME) + " · " + enemySkill->GetName());
+                return;
             }
+        }
+    }
 
-            DrawTextAt(window, font, skill.GetSummary(), TOOLTIP_TEXT_SIZE, { textX, lineY }, DIM_TEXT_COLOR);
-            lineY += TOOLTIP_LINE_HEIGHT + TOOLTIP_SECTION_GAP;
+    void Gameplay::DrawSkillDetails(sf::RenderWindow& window, const Skill& skill, const std::string& title) const
+    {
+        // El cartel tapa el registro de combate mientras el mouse este sobre la skill
+        sf::RectangleShape panel(COMBAT_LOG_AREA.size);
+        panel.setPosition(COMBAT_LOG_AREA.position);
+        panel.setFillColor(GAME_OVER_BOX_COLOR);
+        panel.setOutlineColor(GOLD_COLOR);
+        panel.setOutlineThickness(SLOT_BORDER_THICKNESS);
+        window.draw(panel);
 
-            std::vector<std::string> effectLines = skill.GetEffectLines();
+        const float textX = COMBAT_LOG_AREA.position.x + TOOLTIP_PADDING;
+        const float textWidth = COMBAT_LOG_AREA.size.x - TOOLTIP_PADDING * 2.0f;
+        float lineY = COMBAT_LOG_AREA.position.y + TOOLTIP_PADDING / 2.0f;
 
-            if (effectLines.empty())
+        for (const std::string& line : WrapText(font, title, TOOLTIP_TITLE_SIZE, textWidth))
+        {
+            DrawTextAt(window, font, line, TOOLTIP_TITLE_SIZE, { textX, lineY }, GOLD_COLOR);
+            lineY += TOOLTIP_TITLE_LINE_HEIGHT;
+        }
+
+        DrawTextAt(window, font, skill.GetSummary(), TOOLTIP_TEXT_SIZE, { textX, lineY }, DIM_TEXT_COLOR);
+        lineY += TOOLTIP_LINE_HEIGHT + TOOLTIP_SECTION_GAP;
+
+        std::vector<std::string> effectLines = skill.GetEffectLines();
+
+        if (effectLines.empty())
+        {
+            effectLines.push_back("Sin efectos especiales.");
+        }
+
+        for (const std::string& effect : effectLines)
+        {
+            for (const std::string& line : WrapText(font, effect, TOOLTIP_TEXT_SIZE, textWidth))
             {
-                effectLines.push_back("Sin efectos especiales.");
+                DrawTextAt(window, font, line, TOOLTIP_TEXT_SIZE, { textX, lineY }, TEXT_COLOR);
+                lineY += TOOLTIP_LINE_HEIGHT;
             }
-
-            for (const std::string& effect : effectLines)
-            {
-                for (const std::string& line : WrapText(font, effect, TOOLTIP_TEXT_SIZE, textWidth))
-                {
-                    DrawTextAt(window, font, line, TOOLTIP_TEXT_SIZE, { textX, lineY }, TEXT_COLOR);
-                    lineY += TOOLTIP_LINE_HEIGHT;
-                }
-            }
-
-            return;
         }
     }
 
@@ -858,6 +905,13 @@ namespace ReyesCuadra
         if (sinking.IsActive())
         {
             statusText += "     Sinking " + std::to_string(sinking.GetPotency()) + " pot. · " + std::to_string(sinking.GetCount()) + " cant.";
+        }
+
+        const Tremor& tremor = unit.GetTremor();
+
+        if (tremor.IsActive())
+        {
+            statusText += "     Tremor " + std::to_string(tremor.GetPotency()) + " pot. · " + std::to_string(tremor.GetCount()) + " cant.";
         }
 
         const float statusY = barY + HP_BAR_HEIGHT + POISE_TEXT_OFFSET_Y;

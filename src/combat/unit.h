@@ -8,6 +8,7 @@
 
 #include "combat/poise.h"
 #include "combat/sinking.h"
+#include "combat/tremor.h"
 
 namespace ReyesCuadra
 {
@@ -68,6 +69,16 @@ namespace ReyesCuadra
         Sinking& GetSinking();
         const Sinking& GetSinking() const;
 
+        // Estado de Tremor de la unidad (le acerca el proximo umbral de Stagger cuando le hacen Burst)
+        Tremor& GetTremor();
+        const Tremor& GetTremor() const;
+
+        // "Tremor Burst": sube el proximo umbral de Stagger tantos puntos de porcentaje como la potencia de Tremor
+        // (por ejemplo, con 10 de potencia el umbral pasa de 50% a 60%) y saca 1 de cantidad de Tremor.
+        // Si la vida queda por debajo del umbral nuevo, la unidad queda staggereada.
+        // Devuelve cuantos puntos subio el umbral (0 si no tenia Tremor o ya no le quedaban umbrales).
+        int TriggerTremorBurst();
+
         // Deja la unidad como al principio: vida llena y sin estados (para empezar una partida nueva)
         void Reset();
 
@@ -83,6 +94,13 @@ namespace ReyesCuadra
         bool hasPendingStaggerEvent;
         Poise poise;
         Sinking sinking;
+        Tremor tremor;
+
+        // Umbrales originales (sin los cambios del Tremor), para volver a ponerlos al empezar otra partida
+        std::vector<float> originalStaggerThresholds;
+
+        // Rompe los umbrales que la vida ya haya pasado y, si rompio alguno, staggerea a la unidad
+        void CheckStaggerThresholds();
     };
 }
 

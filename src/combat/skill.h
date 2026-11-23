@@ -47,6 +47,37 @@ namespace ReyesCuadra
         int onHitWithoutCrackingCount = 0;
     };
 
+    // Tremor que pone una moneda al golpear (las skills de Lei Heng cambian moneda por moneda)
+    struct CoinTremorEffect
+    {
+        // [Al golpear]: Tremor que le pone al objetivo
+        int potency = 0;
+        int count = 0;
+
+        // Extra que solo se pone si el golpe viene de un clash
+        int clashOnlyPotency = 0;
+        int clashOnlyCount = 0;
+
+        // [Al golpear]: hace Tremor Burst al objetivo (siempre, o solo si el golpe viene de un clash)
+        bool burst = false;
+        bool burstOnlyInClash = false;
+    };
+
+    // Efectos de Tremor de una skill
+    struct TremorEffects
+    {
+        // Un efecto por moneda, en el mismo orden que las monedas (puede tener menos elementos que monedas)
+        std::vector<CoinTremorEffect> perCoin;
+
+        // Poder base +1 cada "tremorPerBasePower" de Tremor del objetivo, hasta maxBasePowerBonus (0 = no tiene este bonus)
+        int tremorPerBasePower = 0;
+        int maxBasePowerBonus = 0;
+
+        // Poder de moneda +1 cada "tremorPerCoinPower" de Tremor del objetivo, hasta maxCoinPowerBonus (0 = no tiene este bonus)
+        int tremorPerCoinPower = 0;
+        int maxCoinPowerBonus = 0;
+    };
+
     // Skill que usa una unidad en un slot: poder base mas una lista de monedas
     class Skill
     {
@@ -81,6 +112,10 @@ namespace ReyesCuadra
         const SinkingEffects& GetSinkingEffects() const;
         void SetSinkingEffects(const SinkingEffects& effects);
 
+        // Efectos de Tremor de la skill
+        const TremorEffects& GetTremorEffects() const;
+        void SetTremorEffects(const TremorEffects& effects);
+
         // Lineas de texto que explican los efectos de la skill (Poise, Sinking, bonus de poder), para el cartel de ayuda
         std::vector<std::string> GetEffectLines() const;
 
@@ -96,6 +131,7 @@ namespace ReyesCuadra
         std::vector<Coin> coins;
         PoiseEffects poiseEffects;
         SinkingEffects sinkingEffects;
+        TremorEffects tremorEffects;
         bool isLocked;
     };
 }

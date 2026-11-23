@@ -4,7 +4,7 @@
 
 namespace ReyesCuadra
 {
-    // Devuelve el generador de numeros aleatorios del juego (se crea una sola vez, con una semilla distinta en cada partida)
+    // Devuelve el generador de numeros aleatorios del juego
     static std::mt19937& GetGenerator();
 
     bool RollChance(float chance)

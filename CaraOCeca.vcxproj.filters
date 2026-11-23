@@ -39,6 +39,9 @@
     <ClCompile Include="src\combat\skill.cpp">
       <Filter>combat</Filter>
     </ClCompile>
+    <ClCompile Include="src\combat\tremor.cpp">
+      <Filter>combat</Filter>
+    </ClCompile>
     <ClCompile Include="src\combat\unit.cpp">
       <Filter>combat</Filter>
     </ClCompile>
@@ -82,6 +85,9 @@
       <Filter>combat</Filter>
     </ClInclude>
     <ClInclude Include="src\combat\skill.h">
+      <Filter>combat</Filter>
+    </ClInclude>
+    <ClInclude Include="src\combat\tremor.h">
       <Filter>combat</Filter>
     </ClInclude>
     <ClInclude Include="src\combat\unit.h">
