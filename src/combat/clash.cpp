@@ -15,6 +15,9 @@ namespace ReyesCuadra
     // Un golpe critico hace este multiplicador de dano (+20%)
     static const float CRITICAL_DAMAGE_MULTIPLIER = 1.2f;
 
+    // Potencia minima que pone un golpe con un estado, por debil que este el que pega
+    static const int MIN_INFLICTED_POTENCY = 1;
+
     // El dano del Tremor - Scorch es (potencia de Tremor + potencia de Burn) dividido esto
     static const int SCORCH_DAMAGE_DIVISOR = 2;
 
@@ -82,7 +85,12 @@ namespace ReyesCuadra
     // Tambien hace los Tremor Burst de la moneda: anota cuanto subio el umbral y el dano del Scorch en result.
     // canConvertToScorch es false cuando el que pega perdio el clash (pega con sus monedas irrompibles):
     // en ese caso no convierte el Tremor en Scorch.
-    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool canConvertToScorch, AttackResult& result, CombatTimeline& timeline);
+    // statusStrength es la fuerza del que pega: multiplica la potencia de Burn y Tremor que pone
+    // (Lei Heng arranca debil, asi que al principio pone menos y despues cada vez mas)
+    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool canConvertToScorch, float statusStrength, AttackResult& result, CombatTimeline& timeline);
+
+    // Potencia de un estado ajustada por la fuerza del que lo pone (redondeada, y al menos 1 si la original no era 0)
+    static int ScaleInflictedPotency(int basePotency, float statusStrength);
 
     // Aplica los efectos [Al golpear] de Sinking de la skill sobre el objetivo
     static void ApplyOnHitSinking(const Skill& skill, Unit& target);
@@ -283,7 +291,20 @@ namespace ReyesCuadra
         return (bonus > effects.maxFinalPowerBonus) ? effects.maxFinalPowerBonus : bonus;
     }
 
-    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool canConvertToScorch, AttackResult& result, CombatTimeline& timeline)
+    static int ScaleInflictedPotency(int basePotency, float statusStrength)
+    {
+        if (basePotency <= 0)
+        {
+            return 0;
+        }
+
+        const int scaledPotency = static_cast<int>(std::round(static_cast<float>(basePotency) * statusStrength));
+
+        // Aunque este muy debil, un golpe que pone un estado pone al menos 1
+        return (scaledPotency < MIN_INFLICTED_POTENCY) ? MIN_INFLICTED_POTENCY : scaledPotency;
+    }
+
+    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool canConvertToScorch, float statusStrength, AttackResult& result, CombatTimeline& timeline)
     {
         const std::vector<CoinStatusEffect>& perCoin = skill.GetTargetStatusEffects().perCoin;
 
@@ -294,10 +315,12 @@ namespace ReyesCuadra
 
         const CoinStatusEffect& effect = perCoin[coinIndex];
 
-        // Burn
-        if (effect.burnPotency > 0)
+        // Burn (la potencia depende de la fuerza del que pega; la cantidad no)
+        const int burnPotency = ScaleInflictedPotency(effect.burnPotency, statusStrength);
+
+        if (burnPotency > 0)
         {
-            target.GetBurn().AddPotency(effect.burnPotency);
+            target.GetBurn().AddPotency(burnPotency);
         }
 
         if (effect.burnCount > 0)
@@ -314,6 +337,9 @@ namespace ReyesCuadra
             tremorPotency += effect.tremorWithoutCrackingPotency;
             tremorCount += effect.tremorWithoutCrackingCount;
         }
+
+        // Igual que el Burn: la potencia de Tremor depende de la fuerza del que pega
+        tremorPotency = ScaleInflictedPotency(tremorPotency, statusStrength);
 
         if (tremorPotency > 0)
         {
@@ -579,7 +605,7 @@ namespace ReyesCuadra
 
             // Burn y Tremor de esta moneda (y Tremor Burst si la moneda lo tiene)
             // Si solo pegan las irrompibles es porque perdio el clash: ahi no convierte a Scorch
-            ApplyOnHitTargetStatuses(skill, static_cast<size_t>(coinIndex), target, !onlyUnbreakable, result, timeline);
+            ApplyOnHitTargetStatuses(skill, static_cast<size_t>(coinIndex), target, !onlyUnbreakable, attacker.GetDamageMultiplier(), result, timeline);
 
             // Efectos [Al golpear]
             if (effects.onHitPotency > 0)
