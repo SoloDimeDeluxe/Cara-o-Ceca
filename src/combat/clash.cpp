@@ -15,6 +15,11 @@ namespace ReyesCuadra
     // Un golpe critico hace este multiplicador de dano (+20%)
     static const float CRITICAL_DAMAGE_MULTIPLIER = 1.2f;
 
+    // Monedas irrompibles de una skill que perdio el clash (como en Limbus): cada cara suma solo +1
+    // (sin bonus) y ademas los golpes hacen la mitad de dano
+    static const int LOST_CLASH_UNBREAKABLE_COIN_POWER = 1;
+    static const float LOST_CLASH_UNBREAKABLE_DAMAGE_MULTIPLIER = 0.5f;
+
     // Potencia minima que pone un golpe con un estado, por debil que este el que pega
     static const int MIN_INFLICTED_POTENCY = 1;
 
@@ -554,10 +559,11 @@ namespace ReyesCuadra
                 continue;
             }
 
-            // El bonus se recalcula en cada moneda porque el Poise puede subir golpe a golpe
+            // El bonus se recalcula en cada moneda porque el Poise puede subir golpe a golpe.
+            // Si perdio el clash (solo pegan las irrompibles), cada cara suma solo +1.
             if (coin.Flip(attacker.GetHeadsChance()))
             {
-                power += coin.GetPower() + GetCoinPowerBonus(skill, attacker, target);
+                power += onlyUnbreakable ? LOST_CLASH_UNBREAKABLE_COIN_POWER : coin.GetPower() + GetCoinPowerBonus(skill, attacker, target);
             }
 
             // Si el objetivo esquiva, para pegar hay que superar su numero (si empata, se esquiva)
@@ -569,6 +575,12 @@ namespace ReyesCuadra
 
             // El dano del golpe es el poder, ajustado por que tan fuerte esta el que pega (Lei Heng crece con los turnos)
             int hitDamage = (power > 0) ? static_cast<int>(std::round(static_cast<float>(power) * attacker.GetDamageMultiplier())) : 0;
+
+            // Las irrompibles de un clash perdido pegan, pero con la mitad de dano
+            if (onlyUnbreakable)
+            {
+                hitDamage = static_cast<int>(std::round(static_cast<float>(hitDamage) * LOST_CLASH_UNBREAKABLE_DAMAGE_MULTIPLIER));
+            }
 
             const bool isCritical = attacker.GetPoise().RollCritical();
 
