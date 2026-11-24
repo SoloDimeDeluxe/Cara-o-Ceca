@@ -528,7 +528,8 @@ namespace ReyesCuadra
                 continue;
             }
 
-            int hitDamage = (power > 0) ? power : 0;
+            // El dano del golpe es el poder, ajustado por que tan fuerte esta el que pega (Lei Heng crece con los turnos)
+            int hitDamage = (power > 0) ? static_cast<int>(std::round(static_cast<float>(power) * attacker.GetDamageMultiplier())) : 0;
 
             const bool isCritical = attacker.GetPoise().RollCritical();
 

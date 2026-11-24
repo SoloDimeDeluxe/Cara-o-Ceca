@@ -19,6 +19,9 @@ namespace ReyesCuadra
     static const float BASE_HEADS_CHANCE = 0.5f;
     static const float HEADS_CHANCE_PER_SANITY = 0.01f;
 
+    // Dano normal de los golpes (sin hacerse mas debil ni mas fuerte)
+    static const float NORMAL_DAMAGE_MULTIPLIER = 1.0f;
+
     Unit::Unit(const std::string& unitName, int unitMaxHp, sf::Color unitColor)
         : name(unitName)
         , maxHp(unitMaxHp)
@@ -28,7 +31,18 @@ namespace ReyesCuadra
         , brokenThresholds(0)
         , staggerTurnEndsLeft(0)
         , hasPendingStaggerEvent(false)
+        , damageMultiplier(NORMAL_DAMAGE_MULTIPLIER)
     {
+    }
+
+    float Unit::GetDamageMultiplier() const
+    {
+        return damageMultiplier;
+    }
+
+    void Unit::SetDamageMultiplier(float multiplier)
+    {
+        damageMultiplier = multiplier;
     }
 
     const std::string& Unit::GetName() const
@@ -257,5 +271,6 @@ namespace ReyesCuadra
         tremor.Clear();
         burn.Clear();
         staggerThresholds = originalStaggerThresholds;
+        damageMultiplier = NORMAL_DAMAGE_MULTIPLIER;
     }
 }

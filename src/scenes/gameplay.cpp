@@ -25,6 +25,12 @@ namespace ReyesCuadra
     static const float ENEMY_FIRST_STAGGER_THRESHOLD = 0.7f;
     static const float ENEMY_SECOND_STAGGER_THRESHOLD = 0.2f;
 
+    // Lei Heng arranca debil y cada turno pega mas fuerte (multiplica el dano de sus golpes), hasta llegar al 100%.
+    // Asi al principio hay tiempo de juntar SP y Poise antes de que pegue con todo.
+    static const float ENEMY_STARTING_STRENGTH = 0.3f;
+    static const float ENEMY_STRENGTH_PER_TURN = 0.1f;
+    static const float ENEMY_MAX_STRENGTH = 1.0f;
+
     // Posicion de cada skill de Yi Sang dentro de playerSkills (y de los botones)
     enum PlayerSkillIndex
     {
@@ -48,6 +54,7 @@ namespace ReyesCuadra
     static const float SCREEN_WIDTH = 1280.0f;
     static const float SCREEN_HEIGHT = 720.0f;
     static const float TURN_LABEL_Y = 24.0f;
+    static const float STRENGTH_LABEL_Y = 62.0f;
     static const float POISE_TEXT_OFFSET_Y = 4.0f;
     static const float THRESHOLD_MARK_WIDTH = 3.0f;
     static const float THRESHOLD_MARK_OVERHANG = 4.0f;
@@ -168,6 +175,7 @@ namespace ReyesCuadra
     static const unsigned int HP_TEXT_SIZE = 16;
     static const unsigned int POISE_TEXT_SIZE = 15;
     static const unsigned int TURN_SIZE = 30;
+    static const unsigned int STRENGTH_LABEL_SIZE = 16;
     static const unsigned int SLOT_NAME_SIZE = 16;
     static const unsigned int SLOT_SUMMARY_SIZE = 13;
     static const unsigned int VS_SIZE = 18;
@@ -572,6 +580,16 @@ namespace ReyesCuadra
 
     void Gameplay::PrepareTurn()
     {
+        // Fuerza de Lei Heng este turno: 30% en el turno 1 y +10% por turno, hasta 100%
+        float enemyStrength = ENEMY_STARTING_STRENGTH + ENEMY_STRENGTH_PER_TURN * static_cast<float>(turn - 1);
+
+        if (enemyStrength > ENEMY_MAX_STRENGTH)
+        {
+            enemyStrength = ENEMY_MAX_STRENGTH;
+        }
+
+        enemy.SetDamageMultiplier(enemyStrength);
+
         // Una unidad staggereada no actua este turno
         if (enemy.IsStaggered())
         {
@@ -1245,6 +1263,13 @@ namespace ReyesCuadra
         // Numero de turno en el medio de la pantalla
         const sf::FloatRect turnArea({ 0.0f, TURN_LABEL_Y }, { SCREEN_WIDTH, static_cast<float>(TURN_SIZE) });
         DrawTextCentered(window, font, "Turno " + std::to_string(turn), TURN_SIZE, turnArea, GOLD_COLOR);
+
+        // Abajo del turno, que tan fuerte esta pegando Lei Heng (en rojo cuando ya pega con todo)
+        const float enemyStrength = enemy.GetDamageMultiplier();
+        const std::string strengthText = "Fuerza de Lei Heng: " + FormatPercent(enemyStrength);
+        const sf::FloatRect strengthArea({ 0.0f, STRENGTH_LABEL_Y }, { SCREEN_WIDTH, static_cast<float>(STRENGTH_LABEL_SIZE) });
+
+        DrawTextCentered(window, font, strengthText, STRENGTH_LABEL_SIZE, strengthArea, (enemyStrength >= ENEMY_MAX_STRENGTH) ? UNFAVORABLE_COLOR : DIM_TEXT_COLOR);
     }
 
     void Gameplay::DrawSlots(sf::RenderWindow& window) const

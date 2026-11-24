@@ -84,6 +84,10 @@ namespace ReyesCuadra
         Burn& GetBurn();
         const Burn& GetBurn() const;
 
+        // Multiplicador del dano de los golpes de esta unidad (1 = normal). Lei Heng arranca debil y se hace mas fuerte con los turnos.
+        float GetDamageMultiplier() const;
+        void SetDamageMultiplier(float multiplier);
+
         // Deja la unidad como al principio: vida llena y sin estados (para empezar una partida nueva)
         void Reset();
 
@@ -97,6 +101,7 @@ namespace ReyesCuadra
         size_t brokenThresholds;
         int staggerTurnEndsLeft;
         bool hasPendingStaggerEvent;
+        float damageMultiplier;
         Poise poise;
         Sinking sinking;
         Tremor tremor;
