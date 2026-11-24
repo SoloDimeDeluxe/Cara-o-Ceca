@@ -198,6 +198,9 @@ namespace ReyesCuadra
         // Dibuja la tarjeta de un slot. Si no hay skill, muestra emptyText (por ejemplo "Sin acción" o "Staggereado").
         void DrawSlotCard(sf::RenderWindow& window, sf::FloatRect bounds, const Skill* skill, sf::Color fillColor, bool isHighlighted, const std::string& emptyText) const;
 
+        // Monedas de la skill abajo de la tarjeta (las irrompibles con borde rojo), para saber de entrada cuantas tiene
+        void DrawCardCoins(sf::RenderWindow& window, sf::FloatRect bounds, const Skill& skill) const;
+
         // Dibuja entre las dos filas que tan probable es ganar el clash de esa columna (o si no hay clash)
         void DrawClashPreview(sf::RenderWindow& window, int slotIndex, sf::FloatRect area) const;
 

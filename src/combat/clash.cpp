@@ -93,11 +93,11 @@ namespace ReyesCuadra
     // Aplica el Burn y el Tremor de la moneda indicada sobre el objetivo y, si corresponde, le hace Tremor Burst.
     // Devuelve cuantos puntos subio el umbral de Stagger por los Burst (0 si no hubo).
     // Tambien hace los Tremor Burst de la moneda: anota cuanto subio el umbral y el dano del Scorch en result.
-    // canConvertToScorch es false cuando el que pega perdio el clash (pega con sus monedas irrompibles):
-    // en ese caso no convierte el Tremor en Scorch.
+    // attackerDidNotLoseClash es false cuando el que pega perdio el clash (pega con sus monedas irrompibles):
+    // en ese caso no convierte el Tremor en Scorch ni hace Tremor Burst.
     // statusStrength es la fuerza del que pega: multiplica la potencia de Burn y Tremor que pone
     // (Lei Heng arranca debil, asi que al principio pone menos y despues cada vez mas)
-    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool canConvertToScorch, float statusStrength, AttackResult& result, CombatTimeline& timeline);
+    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool attackerDidNotLoseClash, float statusStrength, AttackResult& result, CombatTimeline& timeline);
 
     // Potencia de un estado ajustada por la fuerza del que lo pone (redondeada, y al menos 1 si la original no era 0)
     static int ScaleInflictedPotency(int basePotency, float statusStrength);
@@ -317,7 +317,7 @@ namespace ReyesCuadra
         return (scaledPotency < MIN_INFLICTED_POTENCY) ? MIN_INFLICTED_POTENCY : scaledPotency;
     }
 
-    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool canConvertToScorch, float statusStrength, AttackResult& result, CombatTimeline& timeline)
+    static void ApplyOnHitTargetStatuses(const Skill& skill, size_t coinIndex, Unit& target, bool attackerDidNotLoseClash, float statusStrength, AttackResult& result, CombatTimeline& timeline)
     {
         const std::vector<CoinStatusEffect>& perCoin = skill.GetTargetStatusEffects().perCoin;
 
@@ -366,15 +366,16 @@ namespace ReyesCuadra
 
         // Si la moneda lo indica, el Tremor pasa a ser Tremor - Scorch (antes del Burst, como en el juego).
         // No pasa si el que pega perdio el clash: solo si lo gano o si pega sin oposicion.
-        if (effect.convertsTremorToScorch && canConvertToScorch && !DidHitCrack())
+        if (effect.convertsTremorToScorch && attackerDidNotLoseClash && !DidHitCrack())
         {
             target.GetTremor().ConvertToScorch();
         }
 
-        // El Burst va despues de poner los estados de esta moneda, y solo si se cumple su condicion
+        // El Burst va despues de poner los estados de esta moneda, y solo si se cumple su condicion.
+        // Si el que pega perdio el clash (solo pegan sus irrompibles), no hay Burst.
         const bool crackingConditionMet = !effect.burstOnlyWithoutCracking || !DidHitCrack();
 
-        if (effect.burstTimes > 0 && crackingConditionMet)
+        if (effect.burstTimes > 0 && crackingConditionMet && attackerDidNotLoseClash)
         {
             for (int burstIndex = 0; burstIndex < effect.burstTimes && !target.IsDead(); burstIndex++)
             {

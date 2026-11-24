@@ -176,6 +176,9 @@ namespace ReyesCuadra
     static const float COIN_OUTLINE_THICKNESS = 2.0f;
     static const sf::Color COIN_STRIP_COLOR = sf::Color(0, 0, 0, 170);
     static const sf::Color COIN_HEADS_COLOR = sf::Color(230, 195, 90);
+
+    // Monedas fijas abajo de cada tarjeta (sin tirar todavia): un dorado mas apagado
+    static const sf::Color CARD_COIN_COLOR = sf::Color(190, 155, 75);
     static const sf::Color COIN_TAILS_COLOR = sf::Color(95, 90, 100);
     static const sf::Color COIN_BROKEN_COLOR = sf::Color(30, 28, 32);
     static const sf::Color COIN_OUTLINE_COLOR = sf::Color(60, 50, 40);
@@ -1368,8 +1371,7 @@ namespace ReyesCuadra
             }
             case CombatEventType::Miss:
             {
-                // Golpe esquivado: "Miss" sobre la tarjeta y sobre la figura del que esquivo
-                SpawnFloatingText("Miss", GetHitPosition(event), MISS_COLOR);
+                // Golpe esquivado: "Miss" sobre la figura del que esquivo (en la arena)
                 arena.OnMiss(event.targetIsPlayer);
                 SpawnFloatingText("Miss", arena.GetHeadPosition(event.targetIsPlayer), MISS_COLOR);
 
@@ -1848,10 +1850,32 @@ namespace ReyesCuadra
             textY += SLOT_NAME_LINE_HEIGHT;
         }
 
-        for (const std::string& line : WrapText(font, skill->GetSummary(), SLOT_SUMMARY_SIZE, textWidth))
+        // Abajo del nombre: poder base y cuanto suma cada cara (la cantidad de monedas se ve con los circulos)
+        const std::vector<Coin>& coins = skill->GetCoins();
+        const int coinPower = coins.empty() ? 0 : coins.front().GetPower();
+        const std::string powerText = "Base " + std::to_string(skill->GetBasePower()) + "  ·  +" + std::to_string(coinPower) + " por cara";
+
+        DrawTextAt(window, font, powerText, SLOT_SUMMARY_SIZE, { bounds.position.x + SLOT_TEXT_PADDING, textY }, DIM_TEXT_COLOR);
+        DrawCardCoins(window, bounds, *skill);
+    }
+
+    void Gameplay::DrawCardCoins(sf::RenderWindow& window, sf::FloatRect bounds, const Skill& skill) const
+    {
+        // Mismas posiciones que las monedas del clash, asi cuando arranca la pelea quedan una encima de la otra
+        const float centerY = bounds.position.y + bounds.size.y - COIN_STRIP_HEIGHT / 2.0f;
+        const std::vector<Coin>& coins = skill.GetCoins();
+
+        for (size_t coinIndex = 0; coinIndex < coins.size(); coinIndex++)
         {
-            DrawTextAt(window, font, line, SLOT_SUMMARY_SIZE, { bounds.position.x + SLOT_TEXT_PADDING, textY }, DIM_TEXT_COLOR);
-            textY += SLOT_SUMMARY_LINE_HEIGHT;
+            const float centerX = bounds.position.x + SLOT_TEXT_PADDING + COIN_RADIUS + static_cast<float>(coinIndex) * (COIN_RADIUS * 2.0f + COIN_GAP);
+
+            sf::CircleShape coin(COIN_RADIUS);
+            coin.setOrigin({ COIN_RADIUS, COIN_RADIUS });
+            coin.setPosition({ centerX, centerY });
+            coin.setFillColor(CARD_COIN_COLOR);
+            coin.setOutlineThickness(COIN_OUTLINE_THICKNESS);
+            coin.setOutlineColor(coins[coinIndex].IsUnbreakable() ? COIN_BREAKING_COLOR : COIN_OUTLINE_COLOR);
+            window.draw(coin);
         }
     }
 
