@@ -28,6 +28,11 @@ namespace ReyesCuadra
     static const int SANITY_PER_CLASH_WIN = 10;
     static const float SANITY_BONUS_PER_EXTRA_ROUND = 0.2f;
 
+    // Perder un clash saca cordura: 3, o 4 si el clash fue largo (mas de LONG_CLASH_ROUNDS rondas)
+    static const int SANITY_PER_CLASH_LOSS = 3;
+    static const int SANITY_EXTRA_LOSS_FOR_LONG_CLASH = 1;
+    static const int LONG_CLASH_ROUNDS = 2;
+
     // Bonus de poder de moneda: +1 cada 6 de (potencia de Poise propio + potencia de Sinking del objetivo), hasta +2
     static const int POISE_PER_COIN_POWER = 6;
     static const int MAX_POISE_COIN_POWER_BONUS = 2;
@@ -113,6 +118,9 @@ namespace ReyesCuadra
 
     // Cuanta cordura gana quien gana un clash que duro esa cantidad de rondas
     static int GetClashWinSanity(int rounds);
+
+    // Cordura que pierde el que pierde el clash (3, o 4 si el clash fue largo)
+    static int GetClashLossSanity(int rounds);
 
     // Ataca al objetivo con las primeras "coinsToUse" monedas de la skill. El poder va subiendo moneda por moneda
     // (base, base + primera cara, etc.) y cada moneda hace tanto dano como el poder que hay en ese momento.
@@ -525,6 +533,11 @@ namespace ReyesCuadra
         return static_cast<int>(static_cast<float>(SANITY_PER_CLASH_WIN) * multiplier);
     }
 
+    static int GetClashLossSanity(int rounds)
+    {
+        return (rounds > LONG_CLASH_ROUNDS) ? SANITY_PER_CLASH_LOSS + SANITY_EXTRA_LOSS_FOR_LONG_CLASH : SANITY_PER_CLASH_LOSS;
+    }
+
     static AttackResult PerformAttack(Unit& attacker, const Skill& skill, int coinsToUse, Unit& target, bool onlyUnbreakable, int evadePower, CombatTimeline& timeline)
     {
         const std::vector<Coin>& coins = skill.GetCoins();
@@ -731,11 +744,13 @@ namespace ReyesCuadra
         const Skill& loserSkill = outcome.playerWon ? enemySkill : playerSkill;
 
         // Se explica en criollo que paso: quien gano, cuantas monedas le quedaron y cuanto pego
-        // Ganar el clash da cordura (mas si el clash duro varias rondas)
+        // Ganar el clash da cordura (mas si el clash duro varias rondas) y perderlo saca un poco
         const int sanityGain = GetClashWinSanity(outcome.rounds);
+        const int sanityLoss = GetClashLossSanity(outcome.rounds);
         winner.ChangeSanity(sanityGain);
+        loser.ChangeSanity(-sanityLoss);
 
-        std::string line = winner.GetName() + " gana el clash (" + winnerSkill.GetShortName() + " vs " + loserSkill.GetShortName() + ", +" + std::to_string(sanityGain) + " SP): le quedan " + std::to_string(outcome.winnerCoinsLeft);
+        std::string line = winner.GetName() + " gana el clash (" + winnerSkill.GetShortName() + " vs " + loserSkill.GetShortName() + ", +" + std::to_string(sanityGain) + " SP, " + loser.GetName() + " -" + std::to_string(sanityLoss) + " SP): le quedan " + std::to_string(outcome.winnerCoinsLeft);
 
         line += (outcome.winnerCoinsLeft == 1) ? " moneda" : " monedas";
 
