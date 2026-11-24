@@ -46,6 +46,9 @@ namespace ReyesCuadra
         // Texto del cartel o de la linea del registro
         std::string text;
 
+        // Para los carteles de Stagger y Tremor Burst: true si le pasa a alguien (y a quien, con targetIsPlayer)
+        bool bannerHasTarget = false;
+
         // Vida de cada uno justo despues de este paso (la barra de vida se va actualizando con esto)
         int playerHpAfter = 0;
         int enemyHpAfter = 0;
@@ -70,6 +73,9 @@ namespace ReyesCuadra
         // Anota la tirada de la esquiva (el que esquiva es siempre Yi Sang)
         void AddEvadeRoll(int evadePower, const std::vector<bool>& coinFaces, int totalCoins);
         void AddBanner(const std::string& text);
+
+        // Cartel que le pasa a una unidad (Stagger, Tremor Burst): la arena lo muestra en esa figura
+        void AddUnitBanner(const Unit& target, const std::string& text);
         void AddLogLine(const std::string& text);
 
         // Desde aca, las lineas del registro se guardan aparte (los golpes y carteles siguen en su lugar).

@@ -67,6 +67,16 @@ namespace ReyesCuadra
         events.push_back(event);
     }
 
+    void CombatTimeline::AddUnitBanner(const Unit& target, const std::string& text)
+    {
+        CombatEvent event = MakeEvent(CombatEventType::Banner);
+        event.text = text;
+        event.bannerHasTarget = true;
+        event.targetIsPlayer = (&target == player);
+
+        events.push_back(event);
+    }
+
     void CombatTimeline::AddLogLine(const std::string& text)
     {
         CombatEvent event = MakeEvent(CombatEventType::LogLine);

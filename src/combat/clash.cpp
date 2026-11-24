@@ -388,7 +388,7 @@ namespace ReyesCuadra
                 const int raise = target.TriggerTremorBurst();
 
                 result.tremorBurstRaise += raise;
-                timeline.AddBanner(isScorch ? "TREMOR BURST - SCORCH" : "TREMOR BURST");
+                timeline.AddUnitBanner(target, isScorch ? "TREMOR BURST - SCORCH" : "TREMOR BURST");
                 RecordStaggerIfAny(target, timeline);
 
                 // Scorch: dano igual a (Tremor + Burn) / 2 y despues baja 1 la cantidad de Tremor y de Burn
@@ -651,7 +651,7 @@ namespace ReyesCuadra
     {
         if (target.ConsumeStaggerEvent())
         {
-            timeline.AddBanner("¡STAGGER!");
+            timeline.AddUnitBanner(target, "¡STAGGER!");
             timeline.AddLogLine("¡" + target.GetName() + " queda staggereado! Pierde lo que le quedaba del turno y no actúa el próximo.");
         }
     }

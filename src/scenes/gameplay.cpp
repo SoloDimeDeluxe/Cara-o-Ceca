@@ -101,6 +101,9 @@ namespace ReyesCuadra
     static const float SKILL_1_DRAW_CHANCE = 0.6f;
     static const float SKILL_2_DRAW_CHANCE = 0.3f;
     static const float FIGHT_BUTTON_Y = 636.0f;
+
+    // Separacion entre la arena (que va donde esta la mano) y el boton de Combatir/Saltear
+    static const float ARENA_BOTTOM_GAP = 12.0f;
     static const float FIGHT_BUTTON_HEIGHT = 54.0f;
     static const sf::FloatRect COMBAT_LOG_AREA = sf::FloatRect({ 670.0f, 364.0f }, { 580.0f, 326.0f });
 
@@ -295,6 +298,7 @@ namespace ReyesCuadra
         , shakeColumn(NO_COLUMN)
         , shakeIsPlayerRow(false)
         , shakeTimeLeft(0.0f)
+        , arena(gameFont, sf::FloatRect({ MARGIN, SKILL_BUTTONS_TOP }, { SKILL_BUTTON_WIDTH, FIGHT_BUTTON_Y - ARENA_BOTTOM_GAP - SKILL_BUTTONS_TOP }), PLAYER_COLOR, ENEMY_COLOR)
     {
         player.SetStaggerThresholds({ PLAYER_STAGGER_THRESHOLD });
         enemy.SetStaggerThresholds({ ENEMY_FIRST_STAGGER_THRESHOLD, ENEMY_SECOND_STAGGER_THRESHOLD });
@@ -539,6 +543,7 @@ namespace ReyesCuadra
         }
 
         ShowCoinBreakIfRevealed();
+        arena.Update(deltaSeconds);
     }
 
     void Gameplay::ShowCoinBreakIfRevealed()
@@ -553,6 +558,8 @@ namespace ReyesCuadra
         // Empate: nadie pierde moneda y se tira de nuevo
         if (shownClash.playerPower == shownClash.enemyPower)
         {
+            arena.OnClashRoundResult(false, true);
+
             const sf::FloatRect vsArea = GetSlotBounds(activeColumn, false);
             SpawnFloatingText("Empate", { vsArea.position.x + SLOT_WIDTH / 2.0f, VS_ROW_Y }, DIM_TEXT_COLOR);
             return;
@@ -560,6 +567,8 @@ namespace ReyesCuadra
 
         const bool playerLostRound = shownClash.enemyPower > shownClash.playerPower;
         const sf::FloatRect loserCard = GetSlotBounds(activeColumn, playerLostRound);
+
+        arena.OnClashRoundResult(playerLostRound, false);
 
         SpawnFloatingText("-1 moneda", { loserCard.position.x + loserCard.size.x / 2.0f, loserCard.position.y + FLOATING_TEXT_OFFSET_Y }, COIN_BREAKING_COLOR);
     }
@@ -580,8 +589,18 @@ namespace ReyesCuadra
         DrawActiveColumn(window);
         DrawSlots(window);
         DrawClashCoins(window);
+
+        // Eligiendo skills se ve la mano; mientras se ve la pelea (y al terminar), la arena
+        if (state == GameState::ChoosingSkills)
+        {
+            DrawSkillButtons(window);
+        }
+        else
+        {
+            arena.Draw(window);
+        }
+
         DrawFloatingTexts(window);
-        DrawSkillButtons(window);
         fightButton.Draw(window, mousePosition);
         combatLog.Draw(window);
         helpButton.Draw(window, mousePosition);
@@ -1008,6 +1027,9 @@ namespace ReyesCuadra
         timeline.Clear();
         timeline.AddLogLine("-- Turno " + std::to_string(turn) + " --");
 
+        // La arena arranca mostrando como estaban todos al empezar el turno (la logica ya los va a cambiar)
+        arena.Reset(player.IsStaggered(), enemy.IsStaggered());
+
         // Esquiva de Yi Sang que sigue activa: cubre los ataques que le entran directo hasta que pierde o termina el turno
         const Skill* activeEvade = nullptr;
 
@@ -1161,6 +1183,12 @@ namespace ReyesCuadra
                 activeColumn = event.column;
                 isShowingClash = false;
                 eventTimer += COLUMN_START_DURATION;
+
+                // En la arena, cada figura muestra la skill que usa en esta columna
+                const Skill* columnPlayerSkill = playerActions[static_cast<size_t>(event.column)];
+                const Skill* columnEnemySkill = (event.column < static_cast<int>(enemyActions.size())) ? enemyActions[static_cast<size_t>(event.column)] : nullptr;
+
+                arena.OnColumnStart(columnPlayerSkill != nullptr ? columnPlayerSkill->GetShortName() : "", columnEnemySkill != nullptr ? columnEnemySkill->GetShortName() : "");
                 break;
             }
             case CombatEventType::Hit:
@@ -1168,6 +1196,11 @@ namespace ReyesCuadra
                 // Numero de dano flotando sobre la tarjeta del que recibe el golpe, y la tarjeta se sacude
                 const std::string damageText = event.isCritical ? "-" + std::to_string(event.damage) + "!" : "-" + std::to_string(event.damage);
                 SpawnFloatingText(damageText, GetHitPosition(event), event.isCritical ? CRITICAL_DAMAGE_COLOR : DAMAGE_COLOR);
+
+                // En la arena: el que pega se tira encima, el otro retrocede, y el numero sale sobre su cabeza
+                const int targetHpAfter = event.targetIsPlayer ? event.playerHpAfter : event.enemyHpAfter;
+                arena.OnHit(event.targetIsPlayer, targetHpAfter <= 0);
+                SpawnFloatingText(damageText, arena.GetHeadPosition(event.targetIsPlayer), event.isCritical ? CRITICAL_DAMAGE_COLOR : DAMAGE_COLOR);
 
                 shakeColumn = event.column;
                 shakeIsPlayerRow = event.targetIsPlayer;
@@ -1186,6 +1219,7 @@ namespace ReyesCuadra
                 }
 
                 // Las monedas giran un ratito y despues se ve como cayeron y quien gano la ronda
+                arena.OnClashRound();
                 shownClash = event;
                 isShowingClash = true;
                 coinBreakShown = false;
@@ -1198,6 +1232,7 @@ namespace ReyesCuadra
                 shownClash = event;
                 isShowingClash = true;
                 coinBreakShown = true;
+                arena.OnEvade();
                 coinSpinTimeLeft = COIN_SPIN_DURATION;
                 eventTimer += EVADE_ROLL_DURATION;
                 break;
@@ -1206,6 +1241,19 @@ namespace ReyesCuadra
             {
                 bannerText = event.text;
                 bannerTimeLeft = BANNER_DURATION;
+
+                // Stagger o Tremor Burst sobre alguien: su figura se inclina o vibra
+                if (event.bannerHasTarget)
+                {
+                    if (event.text.find("STAGGER") != std::string::npos)
+                    {
+                        arena.OnStagger(event.targetIsPlayer);
+                    }
+                    else if (event.text.find("TREMOR BURST") != std::string::npos)
+                    {
+                        arena.OnTremorBurst(event.targetIsPlayer, event.text.find("SCORCH") != std::string::npos);
+                    }
+                }
                 eventTimer += BANNER_DURATION;
                 break;
             }
@@ -1286,7 +1334,7 @@ namespace ReyesCuadra
         // La quemada tambien puede romper un umbral de Stagger
         if (unit.ConsumeStaggerEvent())
         {
-            timeline.AddBanner("¡STAGGER!");
+            timeline.AddUnitBanner(unit, "¡STAGGER!");
             timeline.AddLogLine("¡" + unit.GetName() + " queda staggereado por la quemadura! No actúa el próximo turno.");
         }
     }

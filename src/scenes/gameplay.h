@@ -13,6 +13,7 @@
 #include "combat/unit.h"
 #include "ui/button.h"
 #include "ui/combat_log.h"
+#include "ui/arena_view.h"
 #include "ui/help_panel.h"
 
 namespace ReyesCuadra
@@ -325,6 +326,9 @@ namespace ReyesCuadra
         int shakeColumn;
         bool shakeIsPlayerRow;
         float shakeTimeLeft;
+
+        // Arena con las dos figuras: ocupa el lugar de la mano mientras se ve la pelea
+        ArenaView arena;
     };
 }
 

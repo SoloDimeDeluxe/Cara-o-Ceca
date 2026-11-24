@@ -64,6 +64,9 @@
     <ClCompile Include="src\ui\button.cpp">
       <Filter>ui</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\arena_view.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
     <ClCompile Include="src\ui\combat_log.cpp">
       <Filter>ui</Filter>
     </ClCompile>
@@ -121,6 +124,9 @@
       <Filter>scenes</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\button.h">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\arena_view.h">
       <Filter>ui</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\combat_log.h">
