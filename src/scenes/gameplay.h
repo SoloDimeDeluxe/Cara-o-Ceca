@@ -368,6 +368,12 @@ namespace ReyesCuadra
 
         // Estadisticas de la partida (se muestran al ganar o perder)
         GameStats stats;
+
+        // Iconos de la cara de cada uno (arriba, al lado de las barras de vida)
+        sf::Texture playerPortrait;
+        sf::Texture enemyPortrait;
+        bool isPlayerPortraitLoaded;
+        bool isEnemyPortraitLoaded;
     };
 }
 

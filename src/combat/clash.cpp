@@ -20,6 +20,9 @@ namespace ReyesCuadra
     static const int LOST_CLASH_UNBREAKABLE_COIN_POWER = 1;
     static const float LOST_CLASH_UNBREAKABLE_DAMAGE_MULTIPLIER = 0.5f;
 
+    // Vida que recupera Yi Sang cada vez que gana un clash
+    static const int PLAYER_CLASH_WIN_HEAL = 5;
+
     // Potencia minima que pone un golpe con un estado, por debil que este el que pega
     static const int MIN_INFLICTED_POTENCY = 1;
 
@@ -766,7 +769,21 @@ namespace ReyesCuadra
         winner.ChangeSanity(sanityGain);
         loser.ChangeSanity(-sanityLoss);
 
-        std::string line = winner.GetName() + " gana el clash (" + winnerSkill.GetShortName() + " vs " + loserSkill.GetShortName() + ", +" + std::to_string(sanityGain) + " SP, " + loser.GetName() + " -" + std::to_string(sanityLoss) + " SP): le quedan " + std::to_string(outcome.winnerCoinsLeft);
+        // Yi Sang ademas se cura un poco cada vez que gana un clash
+        int healedHp = 0;
+
+        if (outcome.playerWon)
+        {
+            healedHp = player.Heal(PLAYER_CLASH_WIN_HEAL);
+
+            if (healedHp > 0)
+            {
+                timeline.AddHeal(player, healedHp);
+            }
+        }
+
+        const std::string healText = (healedHp > 0) ? ", +" + std::to_string(healedHp) + " HP" : "";
+        std::string line = winner.GetName() + " gana el clash (" + winnerSkill.GetShortName() + " vs " + loserSkill.GetShortName() + ", +" + std::to_string(sanityGain) + " SP" + healText + ", " + loser.GetName() + " -" + std::to_string(sanityLoss) + " SP): le quedan " + std::to_string(outcome.winnerCoinsLeft);
 
         line += (outcome.winnerCoinsLeft == 1) ? " moneda" : " monedas";
 

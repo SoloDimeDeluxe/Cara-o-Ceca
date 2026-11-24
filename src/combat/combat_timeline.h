@@ -14,6 +14,7 @@ namespace ReyesCuadra
         ColumnStart,    // empieza a resolverse una columna
         Hit,            // un golpe que hace dano a la vida
         Miss,           // un golpe que el objetivo esquivo (no hace dano)
+        Heal,           // una unidad recupera vida (damage guarda cuanta)
         ClashRound,     // una ronda del clash: como cayo cada moneda y cuanto poder saco cada uno
         EvadeRoll,      // la tirada de la esquiva de Yi Sang (el numero que hay que superar para pegarle)
         Banner,         // cartel grande en el medio (Stagger, Tremor Burst)
@@ -70,6 +71,9 @@ namespace ReyesCuadra
 
         // Anota un golpe esquivado (para mostrar "Miss" sobre el que esquivo)
         void AddMiss(const Unit& target);
+
+        // Anota que una unidad recupero vida (para mostrar el "+N" verde)
+        void AddHeal(const Unit& target, int amount);
 
         // Anota una ronda del clash con el poder de cada lado y las caras/cruces de sus monedas
         void AddClashRound(int playerPower, const std::vector<bool>& playerCoinFaces, int playerTotalCoins, int enemyPower, const std::vector<bool>& enemyCoinFaces, int enemyTotalCoins);

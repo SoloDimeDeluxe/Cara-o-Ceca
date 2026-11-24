@@ -50,6 +50,10 @@ namespace ReyesCuadra
     // Paneles de arriba con el nombre y la vida de cada unidad
     static const float MARGIN = 30.0f;
     static const float PORTRAIT_SIZE = 64.0f;
+
+    // Archivos de los iconos de cada personaje
+    static const char* PLAYER_PORTRAIT_PATH = "res/sprites/yi_sang_portrait.png";
+    static const char* ENEMY_PORTRAIT_PATH = "res/sprites/lei_heng_portrait.png";
     static const float PANEL_TOP = 16.0f;
     static const float NAME_OFFSET_X = 80.0f;
     static const float HP_BAR_OFFSET_Y = 40.0f;
@@ -203,6 +207,7 @@ namespace ReyesCuadra
     static const sf::Color DAMAGE_COLOR = sf::Color(255, 120, 100);
     static const sf::Color CRITICAL_DAMAGE_COLOR = sf::Color(255, 215, 90);
     static const sf::Color MISS_COLOR = sf::Color(170, 205, 235);
+    static const sf::Color HEAL_COLOR = sf::Color(110, 220, 120);
 
     // Valor de columna que significa "ninguna"
     static const int NO_COLUMN = -1;
@@ -267,7 +272,8 @@ namespace ReyesCuadra
 
     // Dibuja el cuadrado de color, el nombre y la barra de vida de una unidad. Si isRightSide es true, se dibuja espejado a la derecha.
     // shownHp es la vida que se ve en la barra (baja de a poco durante la pelea).
-    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp);
+    // portrait es el icono de la cara (nullptr si no se pudo cargar: queda el cuadrado de color)
+    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp, const sf::Texture* portraitTexture);
 
     Gameplay::Gameplay(const sf::Font& gameFont)
         : font(gameFont)
@@ -327,7 +333,15 @@ namespace ReyesCuadra
         , shakeTimeLeft(0.0f)
         , arena(gameFont, sf::FloatRect({ MARGIN, SKILL_BUTTONS_TOP }, { SKILL_BUTTON_WIDTH, FIGHT_BUTTON_Y - ARENA_BOTTOM_GAP - SKILL_BUTTONS_TOP }), PLAYER_COLOR, ENEMY_COLOR)
         , stats()
+        , playerPortrait()
+        , enemyPortrait()
+        , isPlayerPortraitLoaded(false)
+        , isEnemyPortraitLoaded(false)
     {
+        // Iconos de arriba: si no estan los archivos, queda el cuadrado de color
+        isPlayerPortraitLoaded = playerPortrait.loadFromFile(PLAYER_PORTRAIT_PATH);
+        isEnemyPortraitLoaded = enemyPortrait.loadFromFile(ENEMY_PORTRAIT_PATH);
+
         player.SetStaggerThresholds({ PLAYER_STAGGER_THRESHOLD });
         enemy.SetStaggerThresholds({ ENEMY_FIRST_STAGGER_THRESHOLD, ENEMY_SECOND_STAGGER_THRESHOLD });
 
@@ -1378,6 +1392,20 @@ namespace ReyesCuadra
                 eventTimer += HIT_DURATION;
                 break;
             }
+            case CombatEventType::Heal:
+            {
+                // Curacion: "+N HP" verde sobre la figura y sobre la tarjeta del que se curo
+                const std::string healText = "+" + std::to_string(event.damage) + " HP";
+                SpawnFloatingText(healText, arena.GetHeadPosition(event.targetIsPlayer), HEAL_COLOR);
+
+                if (event.column != NO_COLUMN)
+                {
+                    SpawnFloatingText(healText, GetHitPosition(event), HEAL_COLOR);
+                }
+
+                eventTimer += HIT_DURATION;
+                break;
+            }
             case CombatEventType::ClashRound:
             {
                 // Primera ronda de esta columna: se avisa que empieza un clash entre las dos tarjetas
@@ -1751,8 +1779,8 @@ namespace ReyesCuadra
 
     void Gameplay::DrawUnitPanels(sf::RenderWindow& window) const
     {
-        DrawUnitPanel(window, font, player, false, shownPlayerHp);
-        DrawUnitPanel(window, font, enemy, true, shownEnemyHp);
+        DrawUnitPanel(window, font, player, false, shownPlayerHp, isPlayerPortraitLoaded ? &playerPortrait : nullptr);
+        DrawUnitPanel(window, font, enemy, true, shownEnemyHp, isEnemyPortraitLoaded ? &enemyPortrait : nullptr);
 
         // Numero de turno en el medio de la pantalla
         const sf::FloatRect turnArea({ 0.0f, TURN_LABEL_Y }, { SCREEN_WIDTH, static_cast<float>(TURN_SIZE) });
@@ -2301,17 +2329,28 @@ namespace ReyesCuadra
         return std::to_string(percent) + "%";
     }
 
-    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp)
+    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp, const sf::Texture* portraitTexture)
     {
-        // Por ahora cada personaje es un cuadrado de color; despues se puede cambiar por un sprite
+        // Cuadrado del color del personaje con su cara encima (si se pudo cargar el icono)
         const float portraitX = isRightSide ? SCREEN_WIDTH - MARGIN - PORTRAIT_SIZE : MARGIN;
 
-        sf::RectangleShape portrait({ PORTRAIT_SIZE, PORTRAIT_SIZE });
-        portrait.setPosition({ portraitX, PANEL_TOP });
-        portrait.setFillColor(unit.GetColor());
-        portrait.setOutlineColor(SLOT_BORDER_COLOR);
-        portrait.setOutlineThickness(SLOT_BORDER_THICKNESS);
-        window.draw(portrait);
+        sf::RectangleShape portraitFrame({ PORTRAIT_SIZE, PORTRAIT_SIZE });
+        portraitFrame.setPosition({ portraitX, PANEL_TOP });
+        portraitFrame.setFillColor(unit.GetColor());
+        portraitFrame.setOutlineColor(SLOT_BORDER_COLOR);
+        portraitFrame.setOutlineThickness(SLOT_BORDER_THICKNESS);
+        window.draw(portraitFrame);
+
+        if (portraitTexture != nullptr)
+        {
+            // La imagen se agranda o achica para ocupar justo el cuadrado
+            const sf::Vector2f textureSize = sf::Vector2f(portraitTexture->getSize());
+
+            sf::Sprite portraitSprite(*portraitTexture);
+            portraitSprite.setPosition({ portraitX, PANEL_TOP });
+            portraitSprite.setScale({ PORTRAIT_SIZE / textureSize.x, PORTRAIT_SIZE / textureSize.y });
+            window.draw(portraitSprite);
+        }
 
         // Nombre y barra de vida al lado del cuadrado (a la derecha para Yi Sang, a la izquierda para Lei Heng)
         const float barX = isRightSide ? SCREEN_WIDTH - MARGIN - NAME_OFFSET_X - HP_BAR_WIDTH : MARGIN + NAME_OFFSET_X;

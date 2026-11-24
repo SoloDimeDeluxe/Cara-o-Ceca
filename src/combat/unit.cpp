@@ -82,6 +82,25 @@ namespace ReyesCuadra
         CheckStaggerThresholds();
     }
 
+    int Unit::Heal(int amount)
+    {
+        // Un muerto no se cura
+        if (IsDead() || amount <= 0)
+        {
+            return 0;
+        }
+
+        const int hpBefore = hp;
+        hp += amount;
+
+        if (hp > maxHp)
+        {
+            hp = maxHp;
+        }
+
+        return hp - hpBefore;
+    }
+
     void Unit::CheckStaggerThresholds()
     {
         // Se rompen todos los umbrales que la vida haya pasado. Aunque caigan varios de una, es un solo Stagger.

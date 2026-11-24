@@ -31,6 +31,9 @@ namespace ReyesCuadra
         // Le resta vida a la unidad, sin bajar de 0. Si la vida baja de un umbral de Stagger, la unidad queda staggereada.
         void TakeDamage(int damage);
 
+        // Le suma vida a la unidad, sin pasarse de la maxima. Devuelve cuanta vida se recupero de verdad.
+        int Heal(int amount);
+
         // Umbrales de Stagger, como proporcion de la vida maxima (por ejemplo 0.7 = al 70% de vida). Cada uno se rompe una vez.
         void SetStaggerThresholds(const std::vector<float>& thresholds);
         const std::vector<float>& GetStaggerThresholds() const;
