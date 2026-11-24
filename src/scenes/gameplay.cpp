@@ -1963,7 +1963,8 @@ namespace ReyesCuadra
         const Poise& poise = unit.GetPoise();
         const Sinking& sinking = unit.GetSinking();
         const std::string sanitySign = (unit.GetSanity() > 0) ? "+" : "";
-        std::string statusText = unit.IsStaggered() ? "STAGGER   SP " + sanitySign : "SP " + sanitySign + std::to_string(unit.GetSanity()) + " (" + FormatPercent(unit.GetHeadsChance()) + " cara)";
+        // Si esta staggereado se avisa adelante, pero igual se muestra su SP completo
+        std::string statusText = std::string(unit.IsStaggered() ? "STAGGER   " : "") + "SP " + sanitySign + std::to_string(unit.GetSanity()) + " (" + FormatPercent(unit.GetHeadsChance()) + " cara)";
 
         if (poise.IsActive())
         {
