@@ -71,6 +71,7 @@ namespace ReyesCuadra
     static const char* CREDITS_LINES[] =
     {
         "Programación y diseño: Valentin Reyes",
+        "Sprites: Valentin Reyes, basados en los diseños originales de Project Moon",
         "Desarrollo de Videojuegos I - Image Campus, 2026",
         "Juego de fans inspirado en el combate de Limbus Company. Yi Sang, Lei Heng y sus skills pertenecen a Project Moon.",
         "Hecho en C++ con SFML 3.1.",

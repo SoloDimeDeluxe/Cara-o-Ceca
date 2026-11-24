@@ -78,7 +78,8 @@ namespace ReyesCuadra
 
     // ---------- Colores ----------
 
-    static const sf::Color BACKGROUND_COLOR = sf::Color(24, 22, 27);
+    // Un poco mas claro que el resto de la pantalla, para que se vea el traje negro de Yi Sang
+    static const sf::Color BACKGROUND_COLOR = sf::Color(58, 52, 62);
     static const sf::Color BORDER_COLOR = sf::Color(90, 75, 60);
     static const sf::Color FLOOR_COLOR = sf::Color(70, 60, 50);
     static const sf::Color WEAPON_COLOR = sf::Color(205, 205, 215);
@@ -90,6 +91,20 @@ namespace ReyesCuadra
     static const float BORDER_THICKNESS = 2.0f;
     static const float FLOOR_THICKNESS = 2.0f;
     static const float HEAD_LIGHTEN = 40.0f;
+
+    // ---------- Sprites ----------
+
+    // Carpeta y final del nombre de cada pose (por ejemplo res/sprites/yi_sang_attack.png)
+    static const char* SPRITES_FOLDER = "res/sprites/";
+    static const char* POSE_SUFFIXES[FIGHTER_POSE_COUNT] = { "_idle.png", "_attack.png", "_hurt.png" };
+
+    // Cuanto dura cada pose despues del momento que la dispara
+    static const float ATTACK_POSE_DURATION = 0.5f;
+    static const float HURT_POSE_DURATION = 0.4f;
+
+    // Tintes del sprite: rojizo al recibir un golpe, naranja con Scorch
+    static const sf::Color SPRITE_NORMAL_COLOR = sf::Color(255, 255, 255);
+    static const sf::Color SPRITE_HIT_COLOR = sf::Color(255, 130, 130);
 
     // Mezcla dos colores: amount 0 = el primero, 1 = el segundo
     static sf::Color MixColors(sf::Color from, sf::Color to, float amount);
@@ -115,6 +130,33 @@ namespace ReyesCuadra
         enemyFighter.homeX = bounds.position.x + bounds.size.x - HOME_MARGIN_X;
         enemyFighter.facing = -1.0f;
         enemyFighter.scale = ENEMY_SCALE;
+
+        LoadSprites(playerSprites, "yi_sang");
+        LoadSprites(enemySprites, "lei_heng");
+    }
+
+    void ArenaView::LoadSprites(FighterSprites& sprites, const std::string& fileName)
+    {
+        for (int poseIndex = 0; poseIndex < FIGHTER_POSE_COUNT; poseIndex++)
+        {
+            const std::string path = std::string(SPRITES_FOLDER) + fileName + POSE_SUFFIXES[poseIndex];
+            sprites.isLoaded[static_cast<size_t>(poseIndex)] = sprites.textures[static_cast<size_t>(poseIndex)].loadFromFile(path);
+        }
+    }
+
+    FighterPose ArenaView::GetCurrentPose(const ArenaFighter& fighter)
+    {
+        if (fighter.isDefeated || fighter.isStaggered || fighter.hurtPoseTimeLeft > 0.0f)
+        {
+            return FighterPose::Hurt;
+        }
+
+        if (fighter.attackPoseTimeLeft > 0.0f)
+        {
+            return FighterPose::Attack;
+        }
+
+        return FighterPose::Idle;
     }
 
     void ArenaView::Reset(bool playerIsStaggered, bool enemyIsStaggered)
@@ -127,6 +169,8 @@ namespace ReyesCuadra
             fighter->hitFlashTimeLeft = 0.0f;
             fighter->vibrateTimeLeft = 0.0f;
             fighter->returnTimeLeft = 0.0f;
+            fighter->attackPoseTimeLeft = 0.0f;
+            fighter->hurtPoseTimeLeft = 0.0f;
             fighter->isDefeated = false;
             fighter->skillName.clear();
         }
@@ -151,6 +195,8 @@ namespace ReyesCuadra
         enemyFighter.targetOffsetX = GetClashOffset(enemyFighter);
         playerFighter.returnTimeLeft = 0.0f;
         enemyFighter.returnTimeLeft = 0.0f;
+        playerFighter.attackPoseTimeLeft = ATTACK_POSE_DURATION;
+        enemyFighter.attackPoseTimeLeft = ATTACK_POSE_DURATION;
     }
 
     void ArenaView::OnClashRoundResult(bool playerLostRound, bool isTie)
@@ -164,9 +210,13 @@ namespace ReyesCuadra
             return;
         }
 
-        // El que perdio la ronda retrocede; el que gano se queda en el medio
+        // El que perdio la ronda retrocede (y pone cara de golpeado); el que gano se queda en el medio atacando
         ArenaFighter& loser = playerLostRound ? playerFighter : enemyFighter;
+        ArenaFighter& winner = playerLostRound ? enemyFighter : playerFighter;
         loser.targetOffsetX = GetClashOffset(loser) - loser.facing * CLASH_RECOIL;
+        loser.attackPoseTimeLeft = 0.0f;
+        loser.hurtPoseTimeLeft = HURT_POSE_DURATION;
+        winner.attackPoseTimeLeft = ATTACK_POSE_DURATION;
     }
 
     void ArenaView::OnHit(bool targetIsPlayer, bool targetIsDefeated)
@@ -176,6 +226,8 @@ namespace ReyesCuadra
 
         // Golpe fuera de las columnas (la quemada del final del turno): solo destella
         target.hitFlashTimeLeft = HIT_FLASH_DURATION;
+        target.hurtPoseTimeLeft = HURT_POSE_DURATION;
+        target.attackPoseTimeLeft = 0.0f;
         target.isDefeated = targetIsDefeated;
 
         if (attacker.skillName.empty())
@@ -183,6 +235,7 @@ namespace ReyesCuadra
             return;
         }
 
+        attacker.attackPoseTimeLeft = ATTACK_POSE_DURATION;
         attacker.targetOffsetX = GetClashOffset(attacker) + attacker.facing * LUNGE_EXTRA;
         target.targetOffsetX = GetClashOffset(target) - target.facing * HIT_KNOCKBACK;
         attacker.returnTimeLeft = RETURN_DELAY;
@@ -247,6 +300,16 @@ namespace ReyesCuadra
             {
                 fighter->vibrateTimeLeft -= deltaSeconds;
             }
+
+            if (fighter->attackPoseTimeLeft > 0.0f)
+            {
+                fighter->attackPoseTimeLeft -= deltaSeconds;
+            }
+
+            if (fighter->hurtPoseTimeLeft > 0.0f)
+            {
+                fighter->hurtPoseTimeLeft -= deltaSeconds;
+            }
         }
     }
 
@@ -267,8 +330,8 @@ namespace ReyesCuadra
         floor.setFillColor(FLOOR_COLOR);
         window.draw(floor);
 
-        DrawFighter(window, playerFighter);
-        DrawFighter(window, enemyFighter);
+        DrawFighter(window, playerFighter, playerSprites);
+        DrawFighter(window, enemyFighter, enemySprites);
 
         // Chispa del choque: un circulo que crece y se desvanece en el medio
         if (sparkTimeLeft > 0.0f)
@@ -292,10 +355,22 @@ namespace ReyesCuadra
         const ArenaFighter& fighter = isPlayer ? playerFighter : enemyFighter;
         const sf::Vector2f feet = GetFeetPosition(fighter);
 
-        return { feet.x, feet.y - FIGURE_HEIGHT * fighter.scale - HEAD_TEXT_OFFSET_Y };
+        return { feet.x, feet.y - GetFigureHeight(fighter, isPlayer ? playerSprites : enemySprites) - HEAD_TEXT_OFFSET_Y };
     }
 
-    void ArenaView::DrawFighter(sf::RenderWindow& window, const ArenaFighter& fighter) const
+    float ArenaView::GetFigureHeight(const ArenaFighter& fighter, const FighterSprites& sprites) const
+    {
+        const size_t idleIndex = static_cast<size_t>(FighterPose::Idle);
+
+        if (sprites.isLoaded[idleIndex])
+        {
+            return static_cast<float>(sprites.textures[idleIndex].getSize().y);
+        }
+
+        return FIGURE_HEIGHT * fighter.scale;
+    }
+
+    void ArenaView::DrawFighter(sf::RenderWindow& window, const ArenaFighter& fighter, const FighterSprites& sprites) const
     {
         const sf::Vector2f feet = GetFeetPosition(fighter);
 
@@ -311,6 +386,63 @@ namespace ReyesCuadra
             tiltDegrees = -STAGGER_TILT_DEGREES * fighter.facing;
         }
 
+        // Con sprites se usa la imagen de la pose; si no se pudieron cargar, las formas simples
+        if (sprites.isLoaded[static_cast<size_t>(FighterPose::Idle)])
+        {
+            DrawFighterSprite(window, fighter, sprites, feet, tiltDegrees);
+        }
+        else
+        {
+            DrawFighterShapes(window, fighter, feet, tiltDegrees);
+        }
+
+        DrawFighterLabels(window, fighter, GetFigureHeight(fighter, sprites));
+    }
+
+    void ArenaView::DrawFighterSprite(sf::RenderWindow& window, const ArenaFighter& fighter, const FighterSprites& sprites, sf::Vector2f feet, float tiltDegrees) const
+    {
+        // Si falta la imagen de la pose, se usa la de quieto
+        size_t poseIndex = static_cast<size_t>(GetCurrentPose(fighter));
+
+        if (!sprites.isLoaded[poseIndex])
+        {
+            poseIndex = static_cast<size_t>(FighterPose::Idle);
+        }
+
+        const sf::Texture& texture = sprites.textures[poseIndex];
+        const sf::Vector2f textureSize = sf::Vector2f(texture.getSize());
+
+        // Los sprites miran a la derecha y tienen los pies en el centro de abajo:
+        // se apoyan ahi, se dan vuelta si la figura mira a la izquierda y se inclinan
+        sf::Sprite sprite(texture);
+        sprite.setOrigin({ textureSize.x / 2.0f, textureSize.y });
+        sprite.setPosition(feet);
+        sprite.setRotation(sf::degrees(tiltDegrees));
+        sprite.setScale({ fighter.facing, 1.0f });
+
+        // Tinte: rojizo al recibir un golpe, naranja si vibra por Scorch, transparente si perdio
+        sf::Color tint = SPRITE_NORMAL_COLOR;
+
+        if (fighter.hitFlashTimeLeft > 0.0f)
+        {
+            tint = SPRITE_HIT_COLOR;
+        }
+        else if (fighter.vibrateTimeLeft > 0.0f && fighter.isScorchVibration)
+        {
+            tint = SCORCH_COLOR;
+        }
+
+        if (fighter.isDefeated)
+        {
+            tint.a = DEFEATED_ALPHA;
+        }
+
+        sprite.setColor(tint);
+        window.draw(sprite);
+    }
+
+    void ArenaView::DrawFighterShapes(sf::RenderWindow& window, const ArenaFighter& fighter, sf::Vector2f feet, float tiltDegrees) const
+    {
         // Todas las partes se arman con los pies en 0,0 mirando a la derecha; la transformacion las ubica,
         // las da vuelta si mira a la izquierda, las inclina y las agranda
         sf::Transform transform;
@@ -373,6 +505,10 @@ namespace ReyesCuadra
         weapon.setFillColor(weaponColor);
         window.draw(weapon, states);
 
+    }
+
+    void ArenaView::DrawFighterLabels(sf::RenderWindow& window, const ArenaFighter& fighter, float figureHeight) const
+    {
         // Nombre abajo de los pies (sin inclinar) y skill que usa arriba de la cabeza
         const float homeFeetY = bounds.position.y + bounds.size.y - FLOOR_MARGIN_BOTTOM;
         const sf::FloatRect nameArea({ fighter.homeX - LABEL_WIDTH / 2.0f, homeFeetY + NAME_OFFSET_Y }, { LABEL_WIDTH, static_cast<float>(NAME_SIZE) });
@@ -380,7 +516,7 @@ namespace ReyesCuadra
 
         if (!fighter.skillName.empty())
         {
-            const float skillY = homeFeetY - FIGURE_HEIGHT * fighter.scale - SKILL_OFFSET_Y;
+            const float skillY = homeFeetY - figureHeight - SKILL_OFFSET_Y;
             const sf::FloatRect skillArea({ fighter.homeX - LABEL_WIDTH / 2.0f, skillY }, { LABEL_WIDTH, static_cast<float>(SKILL_SIZE) });
             DrawTextCentered(window, font, fighter.skillName, SKILL_SIZE, skillArea, SKILL_COLOR);
         }

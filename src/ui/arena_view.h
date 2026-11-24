@@ -1,12 +1,32 @@
 #ifndef ARENA_VIEW_H
 #define ARENA_VIEW_H
 
+#include <array>
 #include <string>
 
 #include <SFML/Graphics.hpp>
 
 namespace ReyesCuadra
 {
+    // Pose del sprite que se muestra: quieto, atacando o recibiendo un golpe
+    enum class FighterPose
+    {
+        Idle,
+        Attack,
+        Hurt
+    };
+
+    // Cantidad de poses (para el arreglo de texturas)
+    const int FIGHTER_POSE_COUNT = 3;
+
+    // Texturas de las poses de un personaje (si no se pudo cargar alguna, se usa la de quieto;
+    // si no esta ni la de quieto, la figura se dibuja con formas simples)
+    struct FighterSprites
+    {
+        std::array<sf::Texture, FIGHTER_POSE_COUNT> textures;
+        std::array<bool, FIGHTER_POSE_COUNT> isLoaded = { false, false, false };
+    };
+
     // Una de las dos figuras de la arena (Yi Sang a la izquierda, Lei Heng a la derecha)
     struct ArenaFighter
     {
@@ -36,6 +56,10 @@ namespace ReyesCuadra
 
         // Cuando termina este tiempo, la figura vuelve a su lugar
         float returnTimeLeft = 0.0f;
+
+        // Tiempo que le queda mostrando la pose de ataque o la de golpeado
+        float attackPoseTimeLeft = 0.0f;
+        float hurtPoseTimeLeft = 0.0f;
 
         // Staggereado: queda inclinado. Caido: se murio
         bool isStaggered = false;
@@ -84,8 +108,26 @@ namespace ReyesCuadra
         sf::Vector2f GetHeadPosition(bool isPlayer) const;
 
     private:
+        // Carga las 3 poses de un personaje desde res/sprites (fileName_idle.png, _attack.png, _hurt.png)
+        static void LoadSprites(FighterSprites& sprites, const std::string& fileName);
+
+        // Pose que corresponde mostrar ahora (golpeado, atacando o quieto)
+        static FighterPose GetCurrentPose(const ArenaFighter& fighter);
+
         // Dibuja una figura con su transformacion (posicion, para donde mira, inclinacion, temblor)
-        void DrawFighter(sf::RenderWindow& window, const ArenaFighter& fighter) const;
+        void DrawFighter(sf::RenderWindow& window, const ArenaFighter& fighter, const FighterSprites& sprites) const;
+
+        // Dibuja la figura con el sprite de la pose actual
+        void DrawFighterSprite(sf::RenderWindow& window, const ArenaFighter& fighter, const FighterSprites& sprites, sf::Vector2f feet, float tiltDegrees) const;
+
+        // Dibuja la figura con formas simples (si no hay sprites)
+        void DrawFighterShapes(sf::RenderWindow& window, const ArenaFighter& fighter, sf::Vector2f feet, float tiltDegrees) const;
+
+        // Nombre abajo de los pies y skill que usa arriba de la cabeza
+        void DrawFighterLabels(sf::RenderWindow& window, const ArenaFighter& fighter, float figureHeight) const;
+
+        // Alto de la figura parada (el del sprite de quieto, o el de las formas simples)
+        float GetFigureHeight(const ArenaFighter& fighter, const FighterSprites& sprites) const;
 
         // Pie de la figura en este momento (lugar + corrimiento + salto + temblor)
         sf::Vector2f GetFeetPosition(const ArenaFighter& fighter) const;
@@ -97,6 +139,8 @@ namespace ReyesCuadra
         sf::FloatRect bounds;
         ArenaFighter playerFighter;
         ArenaFighter enemyFighter;
+        FighterSprites playerSprites;
+        FighterSprites enemySprites;
 
         // Chispa del choque en el medio de la arena
         float sparkTimeLeft;

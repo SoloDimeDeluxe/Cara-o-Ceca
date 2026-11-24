@@ -37,6 +37,7 @@ En el juego, el botón **Cómo se juega** tiene todas las reglas.
 ## Créditos
 
 - Programación y diseño: Valentin Reyes Cuadra.
+- Sprites de Yi Sang y Lei Heng: Valentin Reyes Cuadra, basados en los diseños originales de Project Moon.
 - Biblioteca: [SFML](https://www.sfml-dev.org/) 3.1 (licencia zlib, ver `lib/sfml/license.md`).
 - Fuente: Crimson Text (SIL Open Font License, ver `res/fonts/OFL.txt`).
-- Fan game sin fines de lucro, inspirado en el sistema de combate de Limbus Company (Project Moon). Yi Sang, Lei Heng y sus skills pertenecen a Project Moon. No usa assets del juego original.
+- Fan game sin fines de lucro, inspirado en el sistema de combate de Limbus Company (Project Moon). Yi Sang, Lei Heng y sus skills pertenecen a Project Moon. No usa assets del juego original: los sprites son propios.
