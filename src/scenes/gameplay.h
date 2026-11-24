@@ -188,6 +188,12 @@ namespace ReyesCuadra
         void DrawFloatingTexts(sf::RenderWindow& window) const;
         void DrawBanner(sf::RenderWindow& window) const;
 
+        // Cuando las monedas terminan de girar, muestra "-1 moneda" sobre la tarjeta del que perdio la ronda
+        void ShowCoinBreakIfRevealed();
+
+        // Texto que sale flotando y se desvanece (dano, "-1 moneda", "¡Clash!")
+        void SpawnFloatingText(const std::string& text, sf::Vector2f position, sf::Color color);
+
         // Monedas del clash que se esta mostrando, abajo de cada tarjeta de la columna activa
         void DrawClashCoins(sf::RenderWindow& window) const;
 
@@ -254,6 +260,9 @@ namespace ReyesCuadra
         Button restartButton;
         Button gameOverMenuButton;
         Button helpButton;
+
+        // Cambia la velocidad con la que se muestra la pelea (x1 o x2)
+        Button speedButton;
         Button resumeButton;
         Button pauseMenuButton;
         HelpPanel helpPanel;
@@ -278,6 +287,12 @@ namespace ReyesCuadra
         CombatTimeline timeline;
         size_t nextEventIndex;
         float eventTimer;
+
+        // Multiplica el tiempo de la pelea: 1 = normal, 2 = el doble de rapido
+        float playbackSpeed;
+
+        // true cuando ya se mostro "-1 moneda" para la ronda de clash que se esta viendo
+        bool coinBreakShown;
 
         // Como queda la partida cuando termina de mostrarse el turno (sigue, victoria o derrota)
         GameState stateAfterPlayback;

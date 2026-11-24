@@ -126,15 +126,21 @@ namespace ReyesCuadra
     static const float CLICK_COOLDOWN_SECONDS = 0.35f;
 
     // Cuanto dura en pantalla cada tipo de paso de la pelea (en segundos)
-    static const float COLUMN_START_DURATION = 0.45f;
-    static const float HIT_DURATION = 0.32f;
-    static const float BANNER_DURATION = 0.9f;
-    static const float LOG_LINE_DURATION = 0.2f;
-    static const float CLASH_ROUND_DURATION = 0.65f;
-    static const float EVADE_ROLL_DURATION = 0.6f;
+    // (a velocidad x1; con x2 todo dura la mitad)
+    static const float COLUMN_START_DURATION = 0.7f;
+    static const float HIT_DURATION = 0.55f;
+    static const float BANNER_DURATION = 1.2f;
+    static const float LOG_LINE_DURATION = 0.3f;
+    static const float CLASH_ROUND_DURATION = 1.2f;
+    static const float EVADE_ROLL_DURATION = 1.1f;
+
+    // Velocidades de la pelea que se alternan con el boton
+    static const float NORMAL_PLAYBACK_SPEED = 1.0f;
+    static const float FAST_PLAYBACK_SPEED = 2.0f;
+    static const sf::FloatRect SPEED_BUTTON_BOUNDS = sf::FloatRect({ 930.0f, 330.0f }, { 160.0f, 28.0f });
 
     // Monedas del clash: cuanto tiempo giran, que tan rapido y como se dibujan
-    static const float COIN_SPIN_DURATION = 0.3f;
+    static const float COIN_SPIN_DURATION = 0.5f;
     static const float COIN_SPIN_SPEED = 40.0f;
     static const float COIN_RADIUS = 7.0f;
     static const float COIN_GAP = 4.0f;
@@ -254,6 +260,7 @@ namespace ReyesCuadra
         , restartButton(gameFont, sf::FloatRect({ SCREEN_WIDTH / 2.0f - GAME_OVER_BUTTON_GAP / 2.0f - GAME_OVER_BUTTON_SIZE.x, SCREEN_HEIGHT / 2.0f + GAME_OVER_BUTTON_OFFSET_Y - GAME_OVER_BUTTON_SIZE.y / 2.0f }, GAME_OVER_BUTTON_SIZE), "Jugar de nuevo", "")
         , gameOverMenuButton(gameFont, sf::FloatRect({ SCREEN_WIDTH / 2.0f + GAME_OVER_BUTTON_GAP / 2.0f, SCREEN_HEIGHT / 2.0f + GAME_OVER_BUTTON_OFFSET_Y - GAME_OVER_BUTTON_SIZE.y / 2.0f }, GAME_OVER_BUTTON_SIZE), "Menú principal", "")
         , helpButton(gameFont, HELP_BUTTON_BOUNDS, "¿Cómo se juega?", "")
+        , speedButton(gameFont, SPEED_BUTTON_BOUNDS, "Velocidad x1", "")
         , resumeButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - PAUSE_BUTTON_SIZE.x) / 2.0f, (SCREEN_HEIGHT - PAUSE_BOX_SIZE.y) / 2.0f + PAUSE_TITLE_HEIGHT }, PAUSE_BUTTON_SIZE), "Seguir", "")
         , pauseMenuButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - PAUSE_BUTTON_SIZE.x) / 2.0f, (SCREEN_HEIGHT - PAUSE_BOX_SIZE.y) / 2.0f + PAUSE_TITLE_HEIGHT + PAUSE_BUTTON_SIZE.y + PAUSE_BUTTON_GAP }, PAUSE_BUTTON_SIZE), "Volver al menú", "")
         , helpPanel(gameFont, { SCREEN_WIDTH, SCREEN_HEIGHT })
@@ -267,6 +274,8 @@ namespace ReyesCuadra
         , timeline(player, enemy)
         , nextEventIndex(0)
         , eventTimer(0.0f)
+        , playbackSpeed(NORMAL_PLAYBACK_SPEED)
+        , coinBreakShown(false)
         , stateAfterPlayback(GameState::ChoosingSkills)
         , activeColumn(NO_COLUMN)
         , shownPlayerHp(static_cast<float>(PLAYER_MAX_HP))
@@ -464,6 +473,9 @@ namespace ReyesCuadra
             return;
         }
 
+        // Con velocidad x2 todo lo de la pelea pasa el doble de rapido
+        deltaSeconds *= playbackSpeed;
+
         // Pelea paso a paso: cuando se termina el tiempo de un paso, se muestra el siguiente
         if (state == GameState::PlayingTurn)
         {
@@ -520,6 +532,41 @@ namespace ReyesCuadra
         {
             coinSpinTimeLeft -= deltaSeconds;
         }
+
+        ShowCoinBreakIfRevealed();
+    }
+
+    void Gameplay::ShowCoinBreakIfRevealed()
+    {
+        if (!isShowingClash || coinBreakShown || coinSpinTimeLeft > 0.0f || shownClash.type != CombatEventType::ClashRound || activeColumn == NO_COLUMN)
+        {
+            return;
+        }
+
+        coinBreakShown = true;
+
+        // Empate: nadie pierde moneda y se tira de nuevo
+        if (shownClash.playerPower == shownClash.enemyPower)
+        {
+            const sf::FloatRect vsArea = GetSlotBounds(activeColumn, false);
+            SpawnFloatingText("Empate", { vsArea.position.x + SLOT_WIDTH / 2.0f, VS_ROW_Y }, DIM_TEXT_COLOR);
+            return;
+        }
+
+        const bool playerLostRound = shownClash.enemyPower > shownClash.playerPower;
+        const sf::FloatRect loserCard = GetSlotBounds(activeColumn, playerLostRound);
+
+        SpawnFloatingText("-1 moneda", { loserCard.position.x + loserCard.size.x / 2.0f, loserCard.position.y + FLOATING_TEXT_OFFSET_Y }, COIN_BREAKING_COLOR);
+    }
+
+    void Gameplay::SpawnFloatingText(const std::string& text, sf::Vector2f position, sf::Color color)
+    {
+        FloatingText floatingText;
+        floatingText.text = text;
+        floatingText.position = position;
+        floatingText.color = color;
+        floatingText.timeLeft = FLOATING_TEXT_DURATION;
+        floatingTexts.push_back(floatingText);
     }
 
     void Gameplay::Draw(sf::RenderWindow& window) const
@@ -533,6 +580,7 @@ namespace ReyesCuadra
         fightButton.Draw(window, mousePosition);
         combatLog.Draw(window);
         helpButton.Draw(window, mousePosition);
+        speedButton.Draw(window, mousePosition);
 
         // Si el mouse esta sobre una skill, se muestra su detalle encima del registro
         if (state == GameState::ChoosingSkills && !helpPanel.IsOpen() && !isPaused)
@@ -1107,12 +1155,8 @@ namespace ReyesCuadra
             case CombatEventType::Hit:
             {
                 // Numero de dano flotando sobre la tarjeta del que recibe el golpe, y la tarjeta se sacude
-                FloatingText floatingText;
-                floatingText.text = event.isCritical ? "-" + std::to_string(event.damage) + "!" : "-" + std::to_string(event.damage);
-                floatingText.position = GetHitPosition(event);
-                floatingText.color = event.isCritical ? CRITICAL_DAMAGE_COLOR : DAMAGE_COLOR;
-                floatingText.timeLeft = FLOATING_TEXT_DURATION;
-                floatingTexts.push_back(floatingText);
+                const std::string damageText = event.isCritical ? "-" + std::to_string(event.damage) + "!" : "-" + std::to_string(event.damage);
+                SpawnFloatingText(damageText, GetHitPosition(event), event.isCritical ? CRITICAL_DAMAGE_COLOR : DAMAGE_COLOR);
 
                 shakeColumn = event.column;
                 shakeIsPlayerRow = event.targetIsPlayer;
@@ -1123,9 +1167,17 @@ namespace ReyesCuadra
             }
             case CombatEventType::ClashRound:
             {
+                // Primera ronda de esta columna: se avisa que empieza un clash entre las dos tarjetas
+                if (!isShowingClash)
+                {
+                    const sf::FloatRect enemyCard = GetSlotBounds(event.column, false);
+                    SpawnFloatingText("¡Clash!", { enemyCard.position.x + SLOT_WIDTH / 2.0f, VS_ROW_Y - VS_ROW_HEIGHT }, GOLD_COLOR);
+                }
+
                 // Las monedas giran un ratito y despues se ve como cayeron y quien gano la ronda
                 shownClash = event;
                 isShowingClash = true;
+                coinBreakShown = false;
                 coinSpinTimeLeft = COIN_SPIN_DURATION;
                 eventTimer += CLASH_ROUND_DURATION;
                 break;
@@ -1134,6 +1186,7 @@ namespace ReyesCuadra
             {
                 shownClash = event;
                 isShowingClash = true;
+                coinBreakShown = true;
                 coinSpinTimeLeft = COIN_SPIN_DURATION;
                 eventTimer += EVADE_ROLL_DURATION;
                 break;
@@ -1246,6 +1299,14 @@ namespace ReyesCuadra
         // Si se acaba de cerrar un cartel, este clic es el segundo de un doble clic: se ignora
         if (clickCooldownClock.getElapsedTime() < sf::seconds(CLICK_COOLDOWN_SECONDS))
         {
+            return;
+        }
+
+        // El boton de velocidad funciona siempre (eligiendo skills o mirando la pelea)
+        if (speedButton.Contains(clickPosition) && (state == GameState::ChoosingSkills || state == GameState::PlayingTurn))
+        {
+            playbackSpeed = (playbackSpeed == NORMAL_PLAYBACK_SPEED) ? FAST_PLAYBACK_SPEED : NORMAL_PLAYBACK_SPEED;
+            speedButton.SetLabel(playbackSpeed == NORMAL_PLAYBACK_SPEED ? "Velocidad x1" : "Velocidad x2");
             return;
         }
 

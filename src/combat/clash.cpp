@@ -720,9 +720,11 @@ namespace ReyesCuadra
             return;
         }
 
+        // Lo que pase durante el ataque (Stagger, etc.) se escribe despues del resumen, para que se lea en orden
+        timeline.HoldLogLines();
         const AttackResult result = PerformAttack(attacker, skill, skill.GetCoinCount(), target, false, -1, timeline);
 
-        timeline.AddLogLine(attacker.GetName() + " ataca sin oposición con " + skill.GetShortName() + ": " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".");
+        timeline.AddSummaryAndReleaseHeld(attacker.GetName() + " ataca sin oposición con " + skill.GetShortName() + ": " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".");
     }
 
     static void ResolveClash(Unit& player, const Skill& playerSkill, Unit& enemy, const Skill& enemySkill, CombatTimeline& timeline)
@@ -754,6 +756,9 @@ namespace ReyesCuadra
 
         line += (outcome.winnerCoinsLeft == 1) ? " moneda" : " monedas";
 
+        // Lo que pase durante el ataque (Stagger, etc.) se escribe despues del resumen, para que se lea en orden
+        timeline.HoldLogLines();
+
         if (winnerSkill.DealsDamageOnWin())
         {
             const AttackResult result = PerformAttack(winner, winnerSkill, outcome.winnerCoinsLeft, loser, false, -1, timeline);
@@ -765,14 +770,15 @@ namespace ReyesCuadra
             line += " y esquiva el ataque.";
         }
 
-        timeline.AddLogLine(line);
+        timeline.AddSummaryAndReleaseHeld(line);
 
         // Las monedas irrompibles del que perdio pegan igual despues del ganador (si sigue vivo)
         if (!loser.IsDead() && !loserSkill.IsDefensive() && CountUnbreakableCoins(loserSkill) > 0)
         {
+            timeline.HoldLogLines();
             const AttackResult result = PerformAttack(loser, loserSkill, loserSkill.GetCoinCount(), winner, true, -1, timeline);
 
-            timeline.AddLogLine("   Las monedas irrompibles de " + loser.GetName() + " pegan igual: " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".");
+            timeline.AddSummaryAndReleaseHeld("   Las monedas irrompibles de " + loser.GetName() + " pegan igual aunque perdió: " + std::to_string(result.damage) + " de daño" + DescribeExtras(result) + ".");
         }
     }
 
@@ -810,6 +816,7 @@ namespace ReyesCuadra
         const int evadePower = RollClashPower(evadeSide, evadeSkill.GetCoinCount(), &evadeFaces);
 
         timeline.AddEvadeRoll(evadePower, evadeFaces, evadeSkill.GetCoinCount());
+        timeline.HoldLogLines();
         const AttackResult result = PerformAttack(attacker, attackSkill, attackSkill.GetCoinCount(), evader, false, evadePower, timeline);
 
         std::string line = evader.GetName() + " esquiva (" + evadeSkill.GetShortName() + ") con " + std::to_string(evadePower) + ": evita " + std::to_string(result.evadedHits) + " de " + std::to_string(attackSkill.GetCoinCount()) + " golpes de " + attacker.GetName() + " (" + attackSkill.GetShortName() + ")";
@@ -823,7 +830,7 @@ namespace ReyesCuadra
             line += ". ¡No le hacen nada!";
         }
 
-        timeline.AddLogLine(line);
+        timeline.AddSummaryAndReleaseHeld(line);
 
         // La esquiva aguanta solo si no la supero ningun golpe
         return result.evadedHits >= attackSkill.GetCoinCount();

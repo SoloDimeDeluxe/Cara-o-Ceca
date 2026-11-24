@@ -11,6 +11,7 @@ namespace ReyesCuadra
         : player(&playerUnit)
         , enemy(&enemyUnit)
         , currentColumn(NO_COLUMN)
+        , isHoldingLogLines(false)
     {
     }
 
@@ -71,7 +72,32 @@ namespace ReyesCuadra
         CombatEvent event = MakeEvent(CombatEventType::LogLine);
         event.text = text;
 
-        events.push_back(event);
+        if (isHoldingLogLines)
+        {
+            heldLogLines.push_back(event);
+        }
+        else
+        {
+            events.push_back(event);
+        }
+    }
+
+    void CombatTimeline::HoldLogLines()
+    {
+        isHoldingLogLines = true;
+    }
+
+    void CombatTimeline::AddSummaryAndReleaseHeld(const std::string& summaryLine)
+    {
+        isHoldingLogLines = false;
+        AddLogLine(summaryLine);
+
+        for (const CombatEvent& heldLine : heldLogLines)
+        {
+            events.push_back(heldLine);
+        }
+
+        heldLogLines.clear();
     }
 
     const std::vector<CombatEvent>& CombatTimeline::GetEvents() const
@@ -82,6 +108,8 @@ namespace ReyesCuadra
     void CombatTimeline::Clear()
     {
         events.clear();
+        heldLogLines.clear();
+        isHoldingLogLines = false;
         currentColumn = NO_COLUMN;
     }
 

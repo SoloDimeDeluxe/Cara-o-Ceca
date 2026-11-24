@@ -72,6 +72,13 @@ namespace ReyesCuadra
         void AddBanner(const std::string& text);
         void AddLogLine(const std::string& text);
 
+        // Desde aca, las lineas del registro se guardan aparte (los golpes y carteles siguen en su lugar).
+        // Sirve para escribir primero el resumen de un ataque y despues lo que paso durante el (Stagger, etc.)
+        void HoldLogLines();
+
+        // Anota la linea de resumen y despues todas las que se guardaron, y vuelve a anotar normal
+        void AddSummaryAndReleaseHeld(const std::string& summaryLine);
+
         const std::vector<CombatEvent>& GetEvents() const;
         void Clear();
 
@@ -83,6 +90,10 @@ namespace ReyesCuadra
         const Unit* enemy;
         int currentColumn;
         std::vector<CombatEvent> events;
+
+        // Lineas del registro guardadas mientras isHoldingLogLines es true
+        std::vector<CombatEvent> heldLogLines;
+        bool isHoldingLogLines;
     };
 }
 
