@@ -85,6 +85,19 @@ namespace ReyesCuadra
         // Esc: cierra la ayuda si esta abierta; si no, pausa o despausa (con la partida terminada no hace nada)
         void HandleEscape();
 
+        // Al soltar el clic izquierdo: si se venia arrastrando una skill, se pone en la columna donde se solto;
+        // si casi no se movio el mouse, funciona como un clic comun (va a la columna seleccionada)
+        void HandleLeftRelease(sf::Vector2f releasePosition);
+
+        // Columna (de las 6) que esta debajo de esa posicion, contando las dos filas de tarjetas; -1 si ninguna
+        int GetColumnAt(sf::Vector2f position) const;
+
+        // true si se esta arrastrando una skill (se apreto sobre una y el mouse ya se movio un poco)
+        bool IsDraggingSkill() const;
+
+        // Dibuja la columna donde caeria la skill y una tarjeta que sigue al mouse con su nombre
+        void DrawDraggedSkill(sf::RenderWindow& window) const;
+
         // Clic con la pausa abierta: Seguir la cierra, Volver al menu pide ir al menu
         void HandlePauseClick(sf::Vector2f clickPosition);
 
@@ -235,6 +248,10 @@ namespace ReyesCuadra
 
         // Que opciones de la mano tienen la Marca del Prescripto este turno
         std::array<std::array<bool, OPTIONS_PER_ACTION>, PLAYER_MAX_ACTIONS> actionOptionMarked;
+
+        // Boton de la mano que se apreto para arrastrar (-1 = ninguno) y donde estaba el mouse al apretarlo
+        int draggedButton;
+        sf::Vector2f dragStartPosition;
 
         // Columnas donde Yi Sang usa una skill marcada (se arma junto con playerActions)
         std::array<bool, SLOT_COUNT> columnUsesMarkedSkill;

@@ -95,6 +95,9 @@ namespace ReyesCuadra
         // Esquiva: Yi Sang salta hacia atras
         void OnEvade();
 
+        // Golpe esquivado: el que pega se tira encima y el otro se corre de un salto, sin recibir nada
+        void OnMiss(bool targetIsPlayer);
+
         // Tremor Burst sobre una figura: vibra (naranja si es Scorch)
         void OnTremorBurst(bool targetIsPlayer, bool isScorch);
 

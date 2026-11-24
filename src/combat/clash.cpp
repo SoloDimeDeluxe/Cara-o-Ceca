@@ -570,6 +570,7 @@ namespace ReyesCuadra
             if (evadePower >= 0 && power <= evadePower)
             {
                 result.evadedHits++;
+                timeline.AddMiss(target);
                 continue;
             }
 

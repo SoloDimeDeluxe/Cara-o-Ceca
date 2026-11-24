@@ -92,6 +92,16 @@ namespace ReyesCuadra
     // y cuanto mas pega una skill marcada (+15%)
     static const int MAX_PRESCRIPT_MARKS_PER_TURN = 2;
 
+    // Arrastrar skills: sin boton apretado, cuanto hay que mover el mouse para que cuente como arrastre,
+    // y como se ve la tarjeta que sigue al mouse
+    static const int NO_DRAGGED_BUTTON = -1;
+    static const float DRAG_THRESHOLD = 8.0f;
+    static const sf::Vector2f DRAG_CARD_SIZE = { 220.0f, 46.0f };
+    static const sf::Color DRAG_CARD_COLOR = sf::Color(30, 60, 66, 230);
+    static const sf::Color DRAG_TARGET_COLOR = sf::Color(220, 190, 120, 60);
+    static const float DRAG_TARGET_OUTLINE = 3.0f;
+    static const unsigned int DRAG_CARD_TEXT_SIZE = 18;
+
     // Turno de un solo ataque de Lei Heng (Cortador de enredos): Yi Sang tambien tiene una sola accion
     static const size_t SINGLE_ENEMY_ACTION = 1;
     static const int SINGLE_PLAYER_ACTION = 1;
@@ -181,6 +191,7 @@ namespace ReyesCuadra
     static const sf::Color ACTIVE_COLUMN_COLOR = sf::Color(220, 190, 120, 40);
     static const sf::Color DAMAGE_COLOR = sf::Color(255, 120, 100);
     static const sf::Color CRITICAL_DAMAGE_COLOR = sf::Color(255, 215, 90);
+    static const sf::Color MISS_COLOR = sf::Color(170, 205, 235);
 
     // Valor de columna que significa "ninguna"
     static const int NO_COLUMN = -1;
@@ -261,6 +272,8 @@ namespace ReyesCuadra
         , actionChoices()
         , actionColumns()
         , actionOptionMarked()
+        , draggedButton(NO_DRAGGED_BUTTON)
+        , dragStartPosition({ 0.0f, 0.0f })
         , columnUsesMarkedSkill()
         , prescriptStacks(0)
         , availableActions(PLAYER_MAX_ACTIONS)
@@ -455,7 +468,9 @@ namespace ReyesCuadra
         else if (event.is<sf::Event::MouseLeft>())
         {
             // Si el mouse sale de la ventana, se lo manda lejos para que no quede nada resaltado
+            // (y si se estaba arrastrando una skill, se suelta sin ponerla)
             mousePosition = OFFSCREEN_MOUSE_POSITION;
+            draggedButton = NO_DRAGGED_BUTTON;
         }
         else if (const sf::Event::MouseButtonPressed* pressed = event.getIf<sf::Event::MouseButtonPressed>())
         {
@@ -468,6 +483,13 @@ namespace ReyesCuadra
                 HandleRightClick(sf::Vector2f(pressed->position));
             }
         }
+        else if (const sf::Event::MouseButtonReleased* released = event.getIf<sf::Event::MouseButtonReleased>())
+        {
+            if (released->button == sf::Mouse::Button::Left)
+            {
+                HandleLeftRelease(sf::Vector2f(released->position));
+            }
+        }
         else if (const sf::Event::KeyPressed* key = event.getIf<sf::Event::KeyPressed>())
         {
             if (key->code == sf::Keyboard::Key::Escape)
@@ -475,6 +497,114 @@ namespace ReyesCuadra
                 HandleEscape();
             }
         }
+    }
+
+    void Gameplay::HandleLeftRelease(sf::Vector2f releasePosition)
+    {
+        if (draggedButton == NO_DRAGGED_BUTTON)
+        {
+            return;
+        }
+
+        const int actionIndex = draggedButton / BUTTONS_PER_ACTION;
+        const int choiceIndex = draggedButton % BUTTONS_PER_ACTION;
+        const bool wasDragged = IsDraggingSkill();
+        draggedButton = NO_DRAGGED_BUTTON;
+
+        // Si mientras tanto se abrio algo o cambio el estado, no se hace nada
+        if (state != GameState::ChoosingSkills || isPaused || helpPanel.IsOpen())
+        {
+            return;
+        }
+
+        if (!wasDragged)
+        {
+            // Casi no se movio: es un clic comun, va a la columna seleccionada
+            AssignAction(actionIndex, choiceIndex);
+            return;
+        }
+
+        // Se arrastro: va a la columna donde se solto (si se solto afuera, no pasa nada)
+        const int column = GetColumnAt(releasePosition);
+
+        if (column != NO_COLUMN)
+        {
+            selectedSlot = column;
+            AssignAction(actionIndex, choiceIndex);
+        }
+    }
+
+    int Gameplay::GetColumnAt(sf::Vector2f position) const
+    {
+        for (int column = 0; column < SLOT_COUNT; column++)
+        {
+            const sf::FloatRect enemyCard = GetSlotBounds(column, false);
+            const sf::FloatRect playerCard = GetSlotBounds(column, true);
+
+            // Toda la columna: desde la tarjeta de Lei Heng hasta la de Yi Sang (con la fila del medio)
+            const bool insideX = position.x >= enemyCard.position.x && position.x <= enemyCard.position.x + enemyCard.size.x;
+            const bool insideY = position.y >= enemyCard.position.y && position.y <= playerCard.position.y + playerCard.size.y;
+
+            if (insideX && insideY)
+            {
+                return column;
+            }
+        }
+
+        return NO_COLUMN;
+    }
+
+    bool Gameplay::IsDraggingSkill() const
+    {
+        if (draggedButton == NO_DRAGGED_BUTTON)
+        {
+            return false;
+        }
+
+        const sf::Vector2f moved = mousePosition - dragStartPosition;
+
+        return moved.length() >= DRAG_THRESHOLD;
+    }
+
+    void Gameplay::DrawDraggedSkill(sf::RenderWindow& window) const
+    {
+        if (!IsDraggingSkill())
+        {
+            return;
+        }
+
+        // La columna donde caeria se ilumina
+        const int column = GetColumnAt(mousePosition);
+
+        if (column != NO_COLUMN)
+        {
+            const sf::FloatRect enemyCard = GetSlotBounds(column, false);
+            const sf::FloatRect playerCard = GetSlotBounds(column, true);
+
+            sf::RectangleShape target({ enemyCard.size.x, playerCard.position.y + playerCard.size.y - enemyCard.position.y });
+            target.setPosition(enemyCard.position);
+            target.setFillColor(DRAG_TARGET_COLOR);
+            target.setOutlineColor(GOLD_COLOR);
+            target.setOutlineThickness(DRAG_TARGET_OUTLINE);
+            window.draw(target);
+        }
+
+        // Tarjeta con el nombre de la skill que sigue al mouse
+        const int actionIndex = draggedButton / BUTTONS_PER_ACTION;
+        const int choiceIndex = draggedButton % BUTTONS_PER_ACTION;
+        const int skillIndex = (choiceIndex < OPTIONS_PER_ACTION) ? actionOptions[static_cast<size_t>(actionIndex)][static_cast<size_t>(choiceIndex)] : static_cast<int>(SKILL_DEFENSE);
+        const std::string skillName = (choiceIndex < OPTIONS_PER_ACTION) ? playerSkills[static_cast<size_t>(skillIndex)].GetShortName() : "Esquivar";
+
+        const sf::Vector2f cardPosition = mousePosition - DRAG_CARD_SIZE / 2.0f;
+
+        sf::RectangleShape card(DRAG_CARD_SIZE);
+        card.setPosition(cardPosition);
+        card.setFillColor(DRAG_CARD_COLOR);
+        card.setOutlineColor(GOLD_COLOR);
+        card.setOutlineThickness(SLOT_BORDER_THICKNESS);
+        window.draw(card);
+
+        DrawTextCentered(window, font, skillName, DRAG_CARD_TEXT_SIZE, sf::FloatRect(cardPosition, DRAG_CARD_SIZE), TEXT_COLOR);
     }
 
     void Gameplay::Update(float deltaSeconds)
@@ -609,8 +739,11 @@ namespace ReyesCuadra
         helpButton.Draw(window, mousePosition);
         speedButton.Draw(window, mousePosition);
 
+        // La skill que se arrastra va arriba de todo lo del juego
+        DrawDraggedSkill(window);
+
         // Si el mouse esta sobre una skill, se muestra su detalle encima del registro
-        if (state == GameState::ChoosingSkills && !helpPanel.IsOpen() && !isPaused)
+        if (state == GameState::ChoosingSkills && !helpPanel.IsOpen() && !isPaused && !IsDraggingSkill())
         {
             DrawSkillTooltip(window);
         }
@@ -1219,6 +1352,16 @@ namespace ReyesCuadra
                 eventTimer += HIT_DURATION;
                 break;
             }
+            case CombatEventType::Miss:
+            {
+                // Golpe esquivado: "Miss" sobre la tarjeta y sobre la figura del que esquivo
+                SpawnFloatingText("Miss", GetHitPosition(event), MISS_COLOR);
+                arena.OnMiss(event.targetIsPlayer);
+                SpawnFloatingText("Miss", arena.GetHeadPosition(event.targetIsPlayer), MISS_COLOR);
+
+                eventTimer += HIT_DURATION;
+                break;
+            }
             case CombatEventType::ClashRound:
             {
                 // Primera ronda de esta columna: se avisa que empieza un clash entre las dos tarjetas
@@ -1432,15 +1575,14 @@ namespace ReyesCuadra
             }
         }
 
-        // Clic en una skill de la mano: esa accion pasa a la columna seleccionada con esa skill
+        // Apretar una skill de la mano: empieza a arrastrarse. Al soltar se decide si fue arrastre
+        // (va a la columna donde se suelta) o un clic comun (va a la columna seleccionada)
         for (size_t buttonIndex = 0; buttonIndex < skillButtons.size(); buttonIndex++)
         {
             if (skillButtons[buttonIndex].IsEnabled() && skillButtons[buttonIndex].Contains(clickPosition))
             {
-                const int actionIndex = static_cast<int>(buttonIndex) / BUTTONS_PER_ACTION;
-                const int choiceIndex = static_cast<int>(buttonIndex) % BUTTONS_PER_ACTION;
-
-                AssignAction(actionIndex, choiceIndex);
+                draggedButton = static_cast<int>(buttonIndex);
+                dragStartPosition = clickPosition;
                 return;
             }
         }
@@ -1602,7 +1744,7 @@ namespace ReyesCuadra
         }
         else
         {
-            const std::string hint = "Acciones: " + std::to_string(CountPlayerActions()) + "/" + std::to_string(availableActions) + "  ·  Clic en una columna y después en una skill de abajo  ·  Clic derecho la saca  ·  Sin acción = te pegan directo";
+            const std::string hint = "Acciones: " + std::to_string(CountPlayerActions()) + "/" + std::to_string(availableActions) + "  ·  Arrastrá una skill de abajo a una columna  ·  Clic derecho la saca  ·  Sin acción = te pegan directo";
 
             DrawTextAt(window, font, hint, HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
         }

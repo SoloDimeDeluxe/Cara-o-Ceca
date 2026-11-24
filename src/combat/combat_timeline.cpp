@@ -36,6 +36,14 @@ namespace ReyesCuadra
         events.push_back(event);
     }
 
+    void CombatTimeline::AddMiss(const Unit& target)
+    {
+        CombatEvent event = MakeEvent(CombatEventType::Miss);
+        event.targetIsPlayer = (&target == player);
+
+        events.push_back(event);
+    }
+
     void CombatTimeline::AddClashRound(int playerPower, const std::vector<bool>& playerCoinFaces, int playerTotalCoins, int enemyPower, const std::vector<bool>& enemyCoinFaces, int enemyTotalCoins)
     {
         CombatEvent event = MakeEvent(CombatEventType::ClashRound);

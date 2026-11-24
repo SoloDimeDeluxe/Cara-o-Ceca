@@ -29,7 +29,7 @@ namespace ReyesCuadra
     static const char* HELP_RULES[] =
     {
         "1. Cada turno Lei Heng hace hasta 6 acciones, una por columna (fila de arriba). Yi Sang tiene 3 acciones (1 sola si Lei Heng tiene un solo ataque) y cada una trae 2 skills sorteadas: S1 sale seguido, S2 a veces y S3 poco. Esquivar siempre está.",
-        "2. Clic en una columna de Yi Sang y después en una skill de alguna acción para ponerla ahí; clic derecho la saca. La skill que usás se gasta y sale otra el turno siguiente; Esquivar gasta la 1ra opción de esa acción. Si no ponés nada en una columna, ese ataque te pega directo.",
+        "2. Arrastrá una skill de una acción hasta la columna que quieras frenar; clic derecho la saca. La skill que usás se gasta y sale otra el turno siguiente; Esquivar gasta la 1ra opción de esa acción. Si no ponés nada en una columna, ese ataque te pega directo.",
         "3. En el clash los dos tiran sus monedas: cada cara suma poder. El que suma más le rompe una moneda al otro, y se repite hasta que uno se queda sin monedas.",
         "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes. Ojo: las monedas irrompibles de Lei Heng pegan aunque pierda el clash, pero cada cara suma solo +1 y hacen la mitad de daño. Lei Heng arranca al 30% de su fuerza (daño, Burn y Tremor) y cada turno sube 10% (arriba se ve).",
         "5. Esquivar no es un clash: tirás una sola vez y cada golpe que no supere tu número no te hace daño. Si esquivás todo, la esquiva sigue activa y enfrenta los próximos ataques que te entren directo, hasta que un golpe la supere o termine el turno.",

@@ -249,6 +249,21 @@ namespace ReyesCuadra
         playerFighter.returnTimeLeft = RETURN_DELAY + JUMP_DURATION;
     }
 
+    void ArenaView::OnMiss(bool targetIsPlayer)
+    {
+        ArenaFighter& attacker = targetIsPlayer ? enemyFighter : playerFighter;
+        ArenaFighter& target = targetIsPlayer ? playerFighter : enemyFighter;
+
+        attacker.attackPoseTimeLeft = ATTACK_POSE_DURATION;
+        attacker.targetOffsetX = GetClashOffset(attacker) + attacker.facing * LUNGE_EXTRA;
+        attacker.returnTimeLeft = RETURN_DELAY;
+
+        // El que esquiva salta para atras y no cambia de pose
+        target.jumpTimeLeft = JUMP_DURATION;
+        target.targetOffsetX = -target.facing * EVADE_BACKSTEP;
+        target.returnTimeLeft = RETURN_DELAY + JUMP_DURATION;
+    }
+
     void ArenaView::OnTremorBurst(bool targetIsPlayer, bool isScorch)
     {
         ArenaFighter& target = targetIsPlayer ? playerFighter : enemyFighter;
