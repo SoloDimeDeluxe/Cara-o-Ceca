@@ -6,6 +6,7 @@
 #include <SFML/Graphics.hpp>
 
 #include "scenes/gameplay.h"
+#include "scenes/main_menu.h"
 #include "ui/text_utils.h"
 
 namespace ReyesCuadra
@@ -22,11 +23,19 @@ namespace ReyesCuadra
     // Ruta de la fuente que usan todos los textos del juego
     static const char* FONT_PATH = "res/fonts/CrimsonText-SemiBold.ttf";
 
-    // Procesa los eventos de la ventana: la cruz la cierra y el resto se lo pasa al gameplay
-    static void HandleWindowEvents(sf::RenderWindow& window, Gameplay& gameplay);
+    // Pantalla que se esta mostrando
+    enum class Scene
+    {
+        Menu,
+        Battle
+    };
 
-    // Limpia la pantalla, dibuja el gameplay y muestra el frame
-    static void DrawFrame(sf::RenderWindow& window, const Gameplay& gameplay);
+    // Procesa los eventos de la ventana: la cruz la cierra y el resto se lo pasa a la escena actual
+    // (el menu puede pedir empezar a jugar o salir)
+    static void HandleWindowEvents(sf::RenderWindow& window, Scene& currentScene, MainMenu& menu, Gameplay& gameplay);
+
+    // Limpia la pantalla, dibuja la escena actual y muestra el frame
+    static void DrawFrame(sf::RenderWindow& window, Scene currentScene, const MainMenu& menu, const Gameplay& gameplay);
 
     void RunGame()
     {
@@ -43,7 +52,11 @@ namespace ReyesCuadra
         sf::RenderWindow window(sf::VideoMode({ SCREEN_WIDTH, SCREEN_HEIGHT }), ToSfString(WINDOW_TITLE), sf::Style::Titlebar | sf::Style::Close);
         window.setFramerateLimit(TARGET_FPS);
 
+        MainMenu menu(font);
         Gameplay gameplay(font);
+
+        // El juego arranca en el menu principal
+        Scene currentScene = Scene::Menu;
 
         // Mide cuanto tiempo paso entre un frame y el siguiente (para las animaciones)
         sf::Clock frameClock;
@@ -52,13 +65,24 @@ namespace ReyesCuadra
         {
             const float deltaSeconds = frameClock.restart().asSeconds();
 
-            HandleWindowEvents(window, gameplay);
-            gameplay.Update(deltaSeconds);
-            DrawFrame(window, gameplay);
+            HandleWindowEvents(window, currentScene, menu, gameplay);
+
+            if (currentScene == Scene::Battle)
+            {
+                gameplay.Update(deltaSeconds);
+
+                // Desde la pausa o el fin de partida se puede volver al menu
+                if (gameplay.ConsumeReturnToMenuRequest())
+                {
+                    currentScene = Scene::Menu;
+                }
+            }
+
+            DrawFrame(window, currentScene, menu, gameplay);
         }
     }
 
-    static void HandleWindowEvents(sf::RenderWindow& window, Gameplay& gameplay)
+    static void HandleWindowEvents(sf::RenderWindow& window, Scene& currentScene, MainMenu& menu, Gameplay& gameplay)
     {
         // En SFML 3 pollEvent devuelve un std::optional: queda vacio cuando ya no hay mas eventos
         while (const std::optional<sf::Event> event = window.pollEvent())
@@ -67,6 +91,21 @@ namespace ReyesCuadra
             {
                 window.close();
             }
+            else if (currentScene == Scene::Menu)
+            {
+                const MenuAction action = menu.HandleEvent(*event);
+
+                if (action == MenuAction::Play)
+                {
+                    // Cada vez que se entra desde el menu arranca una partida nueva
+                    gameplay.StartNewGame();
+                    currentScene = Scene::Battle;
+                }
+                else if (action == MenuAction::Exit)
+                {
+                    window.close();
+                }
+            }
             else
             {
                 gameplay.HandleEvent(*event);
@@ -74,10 +113,19 @@ namespace ReyesCuadra
         }
     }
 
-    static void DrawFrame(sf::RenderWindow& window, const Gameplay& gameplay)
+    static void DrawFrame(sf::RenderWindow& window, Scene currentScene, const MainMenu& menu, const Gameplay& gameplay)
     {
         window.clear(BACKGROUND_COLOR);
-        gameplay.Draw(window);
+
+        if (currentScene == Scene::Menu)
+        {
+            menu.Draw(window);
+        }
+        else
+        {
+            gameplay.Draw(window);
+        }
+
         window.display();
     }
 }

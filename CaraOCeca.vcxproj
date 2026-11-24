@@ -118,8 +118,10 @@ xcopy /y /d /e /i "$(ProjectDir)res" "$(OutDir)res"</Command>
     <ClCompile Include="src\game\game.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\scenes\gameplay.cpp" />
+    <ClCompile Include="src\scenes\main_menu.cpp" />
     <ClCompile Include="src\ui\button.cpp" />
     <ClCompile Include="src\ui\combat_log.cpp" />
+    <ClCompile Include="src\ui\help_panel.cpp" />
     <ClCompile Include="src\ui\text_utils.cpp" />
     <ClCompile Include="src\utils\random.cpp" />
   </ItemGroup>
@@ -137,8 +139,10 @@ xcopy /y /d /e /i "$(ProjectDir)res" "$(OutDir)res"</Command>
     <ClInclude Include="src\combat\unit.h" />
     <ClInclude Include="src\game\game.h" />
     <ClInclude Include="src\scenes\gameplay.h" />
+    <ClInclude Include="src\scenes\main_menu.h" />
     <ClInclude Include="src\ui\button.h" />
     <ClInclude Include="src\ui\combat_log.h" />
+    <ClInclude Include="src\ui\help_panel.h" />
     <ClInclude Include="src\ui\text_utils.h" />
     <ClInclude Include="src\utils\random.h" />
   </ItemGroup>

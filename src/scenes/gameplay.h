@@ -13,6 +13,7 @@
 #include "combat/unit.h"
 #include "ui/button.h"
 #include "ui/combat_log.h"
+#include "ui/help_panel.h"
 
 namespace ReyesCuadra
 {
@@ -64,8 +65,14 @@ namespace ReyesCuadra
         Gameplay(const Gameplay&) = delete;
         Gameplay& operator=(const Gameplay&) = delete;
 
-        // Recibe los eventos de la ventana (movimiento y clics del mouse)
+        // Recibe los eventos de la ventana (movimiento y clics del mouse, y Esc para pausar)
         void HandleEvent(const sf::Event& event);
+
+        // Deja todo como al principio: vida llena, turno 1 y registro vacio (se llama al apretar Jugar en el menu)
+        void StartNewGame();
+
+        // Devuelve true una sola vez si el jugador eligio volver al menu principal (desde la pausa o el fin de partida)
+        bool ConsumeReturnToMenuRequest();
 
         // Avanza las animaciones (la pelea paso a paso, los numeros flotantes, las barras de vida)
         void Update(float deltaSeconds);
@@ -74,8 +81,11 @@ namespace ReyesCuadra
         void Draw(sf::RenderWindow& window) const;
 
     private:
-        // Deja todo como al principio: vida llena, turno 1 y registro vacio
-        void StartNewGame();
+        // Esc: cierra la ayuda si esta abierta; si no, pausa o despausa (con la partida terminada no hace nada)
+        void HandleEscape();
+
+        // Clic con la pausa abierta: Seguir la cierra, Volver al menu pide ir al menu
+        void HandlePauseClick(sf::Vector2f clickPosition);
 
         // Pide al patron las skills de Lei Heng para el turno actual y pone cada accion de Yi Sang en su columna
         // (la accion 1 en la columna 1, etc.) con la primera de sus dos opciones
@@ -152,8 +162,8 @@ namespace ReyesCuadra
         void DrawSkillButtons(sf::RenderWindow& window) const;
         void DrawGameOver(sf::RenderWindow& window) const;
 
-        // Cartel con las reglas del juego
-        void DrawHelp(sf::RenderWindow& window) const;
+        // Cartel de pausa con los botones Seguir y Volver al menu
+        void DrawPause(sf::RenderWindow& window) const;
 
         // Detalle de la skill que esta debajo del mouse (de Yi Sang o de Lei Heng), encima del registro de combate
         void DrawSkillTooltip(sf::RenderWindow& window) const;
@@ -221,12 +231,19 @@ namespace ReyesCuadra
         std::vector<Button> skillButtons;
         Button fightButton;
         Button restartButton;
+        Button gameOverMenuButton;
         Button helpButton;
-        Button closeHelpButton;
+        Button resumeButton;
+        Button pauseMenuButton;
+        HelpPanel helpPanel;
         CombatLog combatLog;
 
         GameState state;
-        bool isShowingHelp;
+        // Con la pausa abierta no avanza la pelea y solo responden sus botones
+        bool isPaused;
+
+        // Se pidio volver al menu principal (lo lee el loop del juego)
+        bool returnToMenuRequested;
 
         // Cuenta el tiempo desde que se cerro el ultimo cartel, para ignorar el segundo clic de un doble clic
         sf::Clock clickCooldownClock;

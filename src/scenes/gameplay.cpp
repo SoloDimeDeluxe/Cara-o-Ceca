@@ -4,6 +4,7 @@
 #include <string>
 
 #include "combat/clash.h"
+#include "ui/help_panel.h"
 #include "ui/text_utils.h"
 #include "utils/random.h"
 
@@ -84,18 +85,19 @@ namespace ReyesCuadra
     static const float FIGHT_BUTTON_HEIGHT = 54.0f;
     static const sf::FloatRect COMBAT_LOG_AREA = sf::FloatRect({ 670.0f, 364.0f }, { 580.0f, 326.0f });
 
-    // Cartel de fin de partida
+    // Cartel de fin de partida: dos botones uno al lado del otro (Jugar de nuevo y Menu principal)
     static const sf::Vector2f GAME_OVER_BOX_SIZE = { 520.0f, 240.0f };
-    static const sf::Vector2f RESTART_BUTTON_SIZE = { 260.0f, 54.0f };
-    static const float RESTART_BUTTON_OFFSET_Y = 60.0f;
+    static const sf::Vector2f GAME_OVER_BUTTON_SIZE = { 220.0f, 54.0f };
+    static const float GAME_OVER_BUTTON_GAP = 20.0f;
+    static const float GAME_OVER_BUTTON_OFFSET_Y = 60.0f;
 
-    // Cartel de "Como se juega" y el boton que lo abre
-    static const sf::Vector2f HELP_BOX_SIZE = { 940.0f, 700.0f };
-    static const float HELP_PADDING = 30.0f;
-    static const float HELP_TITLE_HEIGHT = 50.0f;
-    static const float HELP_LINE_HEIGHT = 20.0f;
-    static const float HELP_RULE_GAP = 6.0f;
-    static const sf::Vector2f CLOSE_HELP_BUTTON_SIZE = { 220.0f, 48.0f };
+    // Cartel de pausa (Esc): dos botones uno abajo del otro
+    static const sf::Vector2f PAUSE_BOX_SIZE = { 420.0f, 280.0f };
+    static const sf::Vector2f PAUSE_BUTTON_SIZE = { 260.0f, 54.0f };
+    static const float PAUSE_TITLE_HEIGHT = 90.0f;
+    static const float PAUSE_BUTTON_GAP = 16.0f;
+
+    // Boton que abre el cartel de "Como se juega"
     static const sf::FloatRect HELP_BUTTON_BOUNDS = sf::FloatRect({ 1100.0f, 330.0f }, { 150.0f, 28.0f });
 
     // Cartel con el detalle de una skill (se muestra al pasar el mouse por su boton)
@@ -172,8 +174,7 @@ namespace ReyesCuadra
     static const unsigned int HINT_SIZE = 15;
     static const unsigned int HAND_HEADER_SIZE = 15;
     static const unsigned int GAME_OVER_TITLE_SIZE = 48;
-    static const unsigned int HELP_TITLE_SIZE = 34;
-    static const unsigned int HELP_RULE_SIZE = 16;
+    static const unsigned int PAUSE_TITLE_SIZE = 40;
     static const unsigned int TOOLTIP_TITLE_SIZE = 21;
     static const unsigned int TOOLTIP_TEXT_SIZE = 17;
 
@@ -200,22 +201,6 @@ namespace ReyesCuadra
 
     // Etiqueta corta que va delante del nombre de cada skill en los botones (mismo orden que PlayerSkillIndex)
     static const char* PLAYER_SKILL_TAGS[] = { "S1", "S2", "S3", "Defensa", "S3-2" };
-
-    // Reglas que se muestran en el cartel de "Como se juega", una por parrafo
-    static const char* HELP_RULES[] =
-    {
-        "1. Cada turno Lei Heng hace hasta 6 acciones, una por columna (fila de arriba). Yi Sang tiene 3 acciones (abajo a la izquierda) y cada una trae 2 skills sorteadas: S1 sale seguido, S2 a veces y S3 poco. Esquivar siempre está.",
-        "2. Clic en una columna de Yi Sang y después en una skill de alguna acción para ponerla ahí; clic derecho la saca. La skill que usás se gasta y sale otra el turno siguiente; Esquivar gasta la 1ra opción de esa acción. Si no ponés nada en una columna, ese ataque te pega directo.",
-        "3. En el clash los dos tiran sus monedas: cada cara suma poder. El que suma más le rompe una moneda al otro, y se repite hasta que uno se queda sin monedas.",
-        "4. El que gana el clash pega con las monedas que le quedan. El porcentaje que aparece entre las dos filas es tu chance de ganar ese clash: buscá los verdes. Ojo: las monedas irrompibles de Lei Heng pegan aunque él pierda el clash.",
-        "5. Esquivar no es un clash: tirás una sola vez y cada golpe que no supere tu número no te hace daño. Si esquivás todo, la esquiva sigue activa y enfrenta los próximos ataques que te entren directo, hasta que un golpe la supere o termine el turno. Ponela temprano para que cubra más.",
-        "6. Poise: las skills de Yi Sang lo van cargando. Cada punto de potencia da 5% de chance de crítico (+20% de daño) y cada 6 de potencia suman +1 al poder de cada moneda. La cantidad baja 1 por crítico y 1 al final del turno; si llega a 0, se pierde.",
-        "7. Sinking: las skills de Yi Sang se lo ponen a Lei Heng. Cada vez que lo golpean pierde cordura igual a la potencia (si ya está en -45, pierde vida) y la cantidad baja 1.",
-        "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos (también las de Lei Heng).",
-        "9. Stagger: las marcas en las barras de vida son umbrales. Si la vida baja de uno, esa unidad queda staggereada: pierde lo que le quedaba del turno, no actúa el turno siguiente y mientras tanto recibe el doble de daño.",
-        "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang y la cantidad baja 1 al final de cada turno. Varias skills hacen Tremor Burst: tu próximo umbral de Stagger sube tantos puntos como la potencia de Tremor, así te staggerea antes. Si Lei Heng no pierde el clash, Tajo y Cortador lo vuelven Tremor - Scorch: cada Burst además te hace (Tremor + Burn) / 2 de daño y baja 1 la cantidad de los dos.",
-        "11. Burn: Lei Heng también te quema. Al final de cada turno recibís daño fijo igual a la potencia y la cantidad baja 1. Sus skills pegan más fuerte cuanto más Burn + Tremor tengas. Abajo de las barras, los estados se muestran como potencia·cantidad."
-    };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
     static sf::Color GetChanceColor(float winChance);
@@ -247,12 +232,16 @@ namespace ReyesCuadra
         , winChances()
         , columnCoveredByEvade()
         , fightButton(gameFont, sf::FloatRect({ MARGIN, FIGHT_BUTTON_Y }, { SKILL_BUTTON_WIDTH, FIGHT_BUTTON_HEIGHT }), "¡Combatir!", "")
-        , restartButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - RESTART_BUTTON_SIZE.x) / 2.0f, SCREEN_HEIGHT / 2.0f + RESTART_BUTTON_OFFSET_Y - RESTART_BUTTON_SIZE.y / 2.0f }, RESTART_BUTTON_SIZE), "Jugar de nuevo", "")
+        , restartButton(gameFont, sf::FloatRect({ SCREEN_WIDTH / 2.0f - GAME_OVER_BUTTON_GAP / 2.0f - GAME_OVER_BUTTON_SIZE.x, SCREEN_HEIGHT / 2.0f + GAME_OVER_BUTTON_OFFSET_Y - GAME_OVER_BUTTON_SIZE.y / 2.0f }, GAME_OVER_BUTTON_SIZE), "Jugar de nuevo", "")
+        , gameOverMenuButton(gameFont, sf::FloatRect({ SCREEN_WIDTH / 2.0f + GAME_OVER_BUTTON_GAP / 2.0f, SCREEN_HEIGHT / 2.0f + GAME_OVER_BUTTON_OFFSET_Y - GAME_OVER_BUTTON_SIZE.y / 2.0f }, GAME_OVER_BUTTON_SIZE), "Menú principal", "")
         , helpButton(gameFont, HELP_BUTTON_BOUNDS, "¿Cómo se juega?", "")
-        , closeHelpButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - CLOSE_HELP_BUTTON_SIZE.x) / 2.0f, (SCREEN_HEIGHT + HELP_BOX_SIZE.y) / 2.0f - HELP_PADDING - CLOSE_HELP_BUTTON_SIZE.y }, CLOSE_HELP_BUTTON_SIZE), "¡Entendido!", "")
+        , resumeButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - PAUSE_BUTTON_SIZE.x) / 2.0f, (SCREEN_HEIGHT - PAUSE_BOX_SIZE.y) / 2.0f + PAUSE_TITLE_HEIGHT }, PAUSE_BUTTON_SIZE), "Seguir", "")
+        , pauseMenuButton(gameFont, sf::FloatRect({ (SCREEN_WIDTH - PAUSE_BUTTON_SIZE.x) / 2.0f, (SCREEN_HEIGHT - PAUSE_BOX_SIZE.y) / 2.0f + PAUSE_TITLE_HEIGHT + PAUSE_BUTTON_SIZE.y + PAUSE_BUTTON_GAP }, PAUSE_BUTTON_SIZE), "Volver al menú", "")
+        , helpPanel(gameFont, { SCREEN_WIDTH, SCREEN_HEIGHT })
         , combatLog(gameFont, COMBAT_LOG_AREA)
         , state(GameState::ChoosingSkills)
-        , isShowingHelp(true)
+        , isPaused(false)
+        , returnToMenuRequested(false)
         , turn(1)
         , selectedSlot(0)
         , mousePosition({ 0.0f, 0.0f })
@@ -441,10 +430,23 @@ namespace ReyesCuadra
                 HandleRightClick(sf::Vector2f(pressed->position));
             }
         }
+        else if (const sf::Event::KeyPressed* key = event.getIf<sf::Event::KeyPressed>())
+        {
+            if (key->code == sf::Keyboard::Key::Escape)
+            {
+                HandleEscape();
+            }
+        }
     }
 
     void Gameplay::Update(float deltaSeconds)
     {
+        // En pausa no avanza nada (ni la pelea ni las animaciones)
+        if (isPaused)
+        {
+            return;
+        }
+
         // Pelea paso a paso: cuando se termina el tiempo de un paso, se muestra el siguiente
         if (state == GameState::PlayingTurn)
         {
@@ -516,7 +518,7 @@ namespace ReyesCuadra
         helpButton.Draw(window, mousePosition);
 
         // Si el mouse esta sobre una skill, se muestra su detalle encima del registro
-        if (state == GameState::ChoosingSkills && !isShowingHelp)
+        if (state == GameState::ChoosingSkills && !helpPanel.IsOpen() && !isPaused)
         {
             DrawSkillTooltip(window);
         }
@@ -528,15 +530,21 @@ namespace ReyesCuadra
             DrawGameOver(window);
         }
 
-        // La ayuda va arriba de todo
-        if (isShowingHelp)
+        if (isPaused)
         {
-            DrawHelp(window);
+            DrawPause(window);
         }
+
+        // La ayuda va arriba de todo
+        helpPanel.Draw(window, mousePosition);
     }
 
     void Gameplay::StartNewGame()
     {
+        isPaused = false;
+        returnToMenuRequested = false;
+        helpPanel.Close();
+
         player.Reset();
         enemy.Reset();
         turn = 1;
@@ -1057,10 +1065,16 @@ namespace ReyesCuadra
     void Gameplay::HandleClick(sf::Vector2f clickPosition)
     {
         // Con la ayuda abierta, cualquier clic la cierra (y arranca la espera para el proximo clic)
-        if (isShowingHelp)
+        if (helpPanel.IsOpen())
         {
-            isShowingHelp = false;
+            helpPanel.Close();
             clickCooldownClock.restart();
+            return;
+        }
+
+        if (isPaused)
+        {
+            HandlePauseClick(clickPosition);
             return;
         }
 
@@ -1081,13 +1095,17 @@ namespace ReyesCuadra
             return;
         }
 
-        // Con la partida terminada, lo unico que responde es el boton de jugar de nuevo
+        // Con la partida terminada, solo responden Jugar de nuevo y Menu principal
         if (state != GameState::ChoosingSkills)
         {
             if (restartButton.Contains(clickPosition))
             {
                 StartNewGame();
                 clickCooldownClock.restart();
+            }
+            else if (gameOverMenuButton.Contains(clickPosition))
+            {
+                returnToMenuRequested = true;
             }
 
             return;
@@ -1102,7 +1120,7 @@ namespace ReyesCuadra
             }
             else if (helpButton.Contains(clickPosition))
             {
-                isShowingHelp = true;
+                helpPanel.Open();
             }
 
             return;
@@ -1138,13 +1156,52 @@ namespace ReyesCuadra
         }
         else if (helpButton.Contains(clickPosition))
         {
-            isShowingHelp = true;
+            helpPanel.Open();
         }
+    }
+
+    void Gameplay::HandleEscape()
+    {
+        if (helpPanel.IsOpen())
+        {
+            helpPanel.Close();
+            return;
+        }
+
+        // Con la partida terminada ya hay un cartel con el boton para ir al menu
+        if (state == GameState::Victory || state == GameState::Defeat)
+        {
+            return;
+        }
+
+        isPaused = !isPaused;
+    }
+
+    void Gameplay::HandlePauseClick(sf::Vector2f clickPosition)
+    {
+        if (resumeButton.Contains(clickPosition))
+        {
+            isPaused = false;
+            clickCooldownClock.restart();
+        }
+        else if (pauseMenuButton.Contains(clickPosition))
+        {
+            isPaused = false;
+            returnToMenuRequested = true;
+        }
+    }
+
+    bool Gameplay::ConsumeReturnToMenuRequest()
+    {
+        const bool wasRequested = returnToMenuRequested;
+        returnToMenuRequested = false;
+
+        return wasRequested;
     }
 
     void Gameplay::HandleRightClick(sf::Vector2f clickPosition)
     {
-        if (state != GameState::ChoosingSkills || isShowingHelp || player.IsStaggered())
+        if (state != GameState::ChoosingSkills || helpPanel.IsOpen() || isPaused || player.IsStaggered())
         {
             return;
         }
@@ -1606,41 +1663,27 @@ namespace ReyesCuadra
 
         DrawTextCentered(window, font, title, GAME_OVER_TITLE_SIZE, titleArea, GOLD_COLOR);
         restartButton.Draw(window, mousePosition);
+        gameOverMenuButton.Draw(window, mousePosition);
     }
 
-    void Gameplay::DrawHelp(sf::RenderWindow& window) const
+    void Gameplay::DrawPause(sf::RenderWindow& window) const
     {
         sf::RectangleShape overlay({ SCREEN_WIDTH, SCREEN_HEIGHT });
         overlay.setFillColor(OVERLAY_COLOR);
         window.draw(overlay);
 
-        const sf::Vector2f boxPosition = { (SCREEN_WIDTH - HELP_BOX_SIZE.x) / 2.0f, (SCREEN_HEIGHT - HELP_BOX_SIZE.y) / 2.0f };
+        const sf::Vector2f boxPosition = { (SCREEN_WIDTH - PAUSE_BOX_SIZE.x) / 2.0f, (SCREEN_HEIGHT - PAUSE_BOX_SIZE.y) / 2.0f };
 
-        sf::RectangleShape box(HELP_BOX_SIZE);
+        sf::RectangleShape box(PAUSE_BOX_SIZE);
         box.setPosition(boxPosition);
         box.setFillColor(GAME_OVER_BOX_COLOR);
         box.setOutlineColor(GOLD_COLOR);
         box.setOutlineThickness(SLOT_BORDER_THICKNESS);
         window.draw(box);
 
-        DrawTextCentered(window, font, "Cómo se juega", HELP_TITLE_SIZE, sf::FloatRect(boxPosition, { HELP_BOX_SIZE.x, HELP_TITLE_HEIGHT }), GOLD_COLOR);
-
-        // Cada regla se corta en varias lineas para que entre en el ancho del cartel
-        const float textWidth = HELP_BOX_SIZE.x - HELP_PADDING * 2.0f;
-        float lineY = boxPosition.y + HELP_TITLE_HEIGHT + HELP_RULE_GAP;
-
-        for (const char* rule : HELP_RULES)
-        {
-            for (const std::string& line : WrapText(font, rule, HELP_RULE_SIZE, textWidth))
-            {
-                DrawTextAt(window, font, line, HELP_RULE_SIZE, { boxPosition.x + HELP_PADDING, lineY }, TEXT_COLOR);
-                lineY += HELP_LINE_HEIGHT;
-            }
-
-            lineY += HELP_RULE_GAP;
-        }
-
-        closeHelpButton.Draw(window, mousePosition);
+        DrawTextCentered(window, font, "Pausa", PAUSE_TITLE_SIZE, sf::FloatRect(boxPosition, { PAUSE_BOX_SIZE.x, PAUSE_TITLE_HEIGHT }), GOLD_COLOR);
+        resumeButton.Draw(window, mousePosition);
+        pauseMenuButton.Draw(window, mousePosition);
     }
 
     static sf::Color GetChanceColor(float winChance)

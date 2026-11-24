@@ -58,10 +58,16 @@
     <ClCompile Include="src\scenes\gameplay.cpp">
       <Filter>scenes</Filter>
     </ClCompile>
+    <ClCompile Include="src\scenes\main_menu.cpp">
+      <Filter>scenes</Filter>
+    </ClCompile>
     <ClCompile Include="src\ui\button.cpp">
       <Filter>ui</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\combat_log.cpp">
+      <Filter>ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\help_panel.cpp">
       <Filter>ui</Filter>
     </ClCompile>
     <ClCompile Include="src\ui\text_utils.cpp">
@@ -111,10 +117,16 @@
     <ClInclude Include="src\scenes\gameplay.h">
       <Filter>scenes</Filter>
     </ClInclude>
+    <ClInclude Include="src\scenes\main_menu.h">
+      <Filter>scenes</Filter>
+    </ClInclude>
     <ClInclude Include="src\ui\button.h">
       <Filter>ui</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\combat_log.h">
+      <Filter>ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\help_panel.h">
       <Filter>ui</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\text_utils.h">
