@@ -48,6 +48,19 @@ namespace ReyesCuadra
         float timeLeft;
     };
 
+    // Numeros de la partida que se muestran en el cartel de fin
+    struct GameStats
+    {
+        int turnsPlayed = 0;
+        int damageDealt = 0;
+        int damageTaken = 0;
+        int clashesWon = 0;
+        int clashesLost = 0;
+        int hitsEvaded = 0;
+        int prescriptsFulfilled = 0;
+        int furiosoUses = 0;
+    };
+
     // Chance ya calculada de una skill de Yi Sang contra una de Lei Heng (para no simular lo mismo dos veces en el turno)
     struct WinChanceCacheEntry
     {
@@ -84,6 +97,9 @@ namespace ReyesCuadra
     private:
         // Esc: cierra la ayuda si esta abierta; si no, pausa o despausa (con la partida terminada no hace nada)
         void HandleEscape();
+
+        // Suma a las estadisticas lo que paso en el turno que se acaba de resolver (dano, clashes, esquivas)
+        void CountTurnStats();
 
         // Al soltar el clic izquierdo: si se venia arrastrando una skill, se pone en la columna donde se solto;
         // si casi no se movio el mouse, funciona como un clic comun (va a la columna seleccionada)
@@ -346,6 +362,9 @@ namespace ReyesCuadra
 
         // Arena con las dos figuras: ocupa el lugar de la mano mientras se ve la pelea
         ArenaView arena;
+
+        // Estadisticas de la partida (se muestran al ganar o perder)
+        GameStats stats;
     };
 }
 

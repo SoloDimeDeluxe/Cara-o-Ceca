@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <string>
+#include <utility>
 
 #include "combat/clash.h"
 #include "ui/help_panel.h"
@@ -121,10 +122,17 @@ namespace ReyesCuadra
     static const sf::FloatRect COMBAT_LOG_AREA = sf::FloatRect({ 670.0f, 364.0f }, { 580.0f, 326.0f });
 
     // Cartel de fin de partida: dos botones uno al lado del otro (Jugar de nuevo y Menu principal)
-    static const sf::Vector2f GAME_OVER_BOX_SIZE = { 520.0f, 240.0f };
+    static const sf::Vector2f GAME_OVER_BOX_SIZE = { 600.0f, 420.0f };
     static const sf::Vector2f GAME_OVER_BUTTON_SIZE = { 220.0f, 54.0f };
     static const float GAME_OVER_BUTTON_GAP = 20.0f;
-    static const float GAME_OVER_BUTTON_OFFSET_Y = 60.0f;
+    static const float GAME_OVER_BUTTON_OFFSET_Y = 150.0f;
+
+    // Estadisticas dentro del cartel de fin: titulo arriba y una linea por dato (nombre a la izquierda, numero a la derecha)
+    static const float GAME_OVER_TITLE_HEIGHT = 80.0f;
+    static const float STATS_PADDING_X = 70.0f;
+    static const float STATS_LINE_HEIGHT = 30.0f;
+    static const unsigned int STATS_TEXT_SIZE = 20;
+    static const size_t GAME_STATS_LINES = 7;
 
     // Cartel de pausa (Esc): dos botones uno abajo del otro
     static const sf::Vector2f PAUSE_BOX_SIZE = { 420.0f, 280.0f };
@@ -315,6 +323,7 @@ namespace ReyesCuadra
         , shakeIsPlayerRow(false)
         , shakeTimeLeft(0.0f)
         , arena(gameFont, sf::FloatRect({ MARGIN, SKILL_BUTTONS_TOP }, { SKILL_BUTTON_WIDTH, FIGHT_BUTTON_Y - ARENA_BOTTOM_GAP - SKILL_BUTTONS_TOP }), PLAYER_COLOR, ENEMY_COLOR)
+        , stats()
     {
         player.SetStaggerThresholds({ PLAYER_STAGGER_THRESHOLD });
         enemy.SetStaggerThresholds({ ENEMY_FIRST_STAGGER_THRESHOLD, ENEMY_SECOND_STAGGER_THRESHOLD });
@@ -772,6 +781,7 @@ namespace ReyesCuadra
 
         player.Reset();
         enemy.Reset();
+        stats = GameStats();
         turn = 1;
         state = GameState::ChoosingSkills;
 
@@ -1216,6 +1226,7 @@ namespace ReyesCuadra
             if (usesMarkedSkill && prescriptStacks < PRESCRIPT_STACKS_FOR_FURIOSO)
             {
                 prescriptStacks++;
+                stats.prescriptsFulfilled++;
                 timeline.AddLogLine("Yi Sang cumple el Prescripto (+15% de daño): " + std::to_string(prescriptStacks) + "/" + std::to_string(PRESCRIPT_STACKS_FOR_FURIOSO) + ".");
 
                 if (prescriptStacks >= PRESCRIPT_STACKS_FOR_FURIOSO)
@@ -1226,6 +1237,7 @@ namespace ReyesCuadra
 
             if (usesFurioso)
             {
+                stats.furiosoUses++;
                 prescriptStacks = 0;
                 timeline.AddLogLine("Yi Sang usó Furioso-Replica: el Prescripto vuelve a 0.");
             }
@@ -1290,6 +1302,8 @@ namespace ReyesCuadra
         {
             stateAfterPlayback = GameState::ChoosingSkills;
         }
+
+        CountTurnStats();
 
         // Arranca a mostrarse la pelea
         state = GameState::PlayingTurn;
@@ -1594,6 +1608,65 @@ namespace ReyesCuadra
         else if (helpButton.Contains(clickPosition))
         {
             helpPanel.Open();
+        }
+    }
+
+    // Suma un clash ganado o perdido segun quien gano su ultima ronda
+    static void CountClashResult(const CombatEvent& lastRound, GameStats& gameStats);
+
+    void Gameplay::CountTurnStats()
+    {
+        stats.turnsPlayed++;
+
+        // Ultima ronda de clash de la columna que se esta recorriendo: el que la gano, gano el clash
+        const CombatEvent* lastClashRound = nullptr;
+
+        for (const CombatEvent& event : timeline.GetEvents())
+        {
+            const bool startsNewColumn = event.type == CombatEventType::ColumnStart;
+
+            if (startsNewColumn && lastClashRound != nullptr)
+            {
+                CountClashResult(*lastClashRound, stats);
+                lastClashRound = nullptr;
+            }
+
+            if (event.type == CombatEventType::ClashRound)
+            {
+                lastClashRound = &event;
+            }
+            else if (event.type == CombatEventType::Hit)
+            {
+                if (event.targetIsPlayer)
+                {
+                    stats.damageTaken += event.damage;
+                }
+                else
+                {
+                    stats.damageDealt += event.damage;
+                }
+            }
+            else if (event.type == CombatEventType::Miss && event.targetIsPlayer)
+            {
+                stats.hitsEvaded++;
+            }
+        }
+
+        if (lastClashRound != nullptr)
+        {
+            CountClashResult(*lastClashRound, stats);
+        }
+    }
+
+    static void CountClashResult(const CombatEvent& lastRound, GameStats& gameStats)
+    {
+        if (lastRound.playerPower > lastRound.enemyPower)
+        {
+            gameStats.clashesWon++;
+        }
+        else
+        {
+            gameStats.clashesLost++;
         }
     }
 
@@ -2117,9 +2190,31 @@ namespace ReyesCuadra
         window.draw(box);
 
         const std::string title = (state == GameState::Victory) ? "¡Victoria!" : "Derrota";
-        const sf::FloatRect titleArea(boxPosition, { GAME_OVER_BOX_SIZE.x, GAME_OVER_BOX_SIZE.y / 2.0f });
+        const sf::FloatRect titleArea(boxPosition, { GAME_OVER_BOX_SIZE.x, GAME_OVER_TITLE_HEIGHT });
 
         DrawTextCentered(window, font, title, GAME_OVER_TITLE_SIZE, titleArea, GOLD_COLOR);
+
+        // Estadisticas de la partida: nombre a la izquierda y numero a la derecha
+        const std::string furiosoText = (stats.furiosoUses > 0) ? "usado " + std::to_string(stats.furiosoUses) + (stats.furiosoUses == 1 ? " vez" : " veces") : "no llegaste";
+        const std::array<std::pair<std::string, std::string>, GAME_STATS_LINES> lines =
+        {{
+            { "Turnos jugados", std::to_string(stats.turnsPlayed) },
+            { "Daño hecho a Lei Heng", std::to_string(stats.damageDealt) },
+            { "Daño recibido", std::to_string(stats.damageTaken) },
+            { "Clashes ganados / perdidos", std::to_string(stats.clashesWon) + " / " + std::to_string(stats.clashesLost) },
+            { "Golpes esquivados", std::to_string(stats.hitsEvaded) },
+            { "Prescriptos cumplidos", std::to_string(stats.prescriptsFulfilled) },
+            { "Furioso-Replica", furiosoText }
+        }};
+
+        float lineY = boxPosition.y + GAME_OVER_TITLE_HEIGHT;
+
+        for (const std::pair<std::string, std::string>& line : lines)
+        {
+            DrawTextAt(window, font, line.first, STATS_TEXT_SIZE, { boxPosition.x + STATS_PADDING_X, lineY }, TEXT_COLOR);
+            DrawTextRightAligned(window, font, line.second, STATS_TEXT_SIZE, { boxPosition.x + GAME_OVER_BOX_SIZE.x - STATS_PADDING_X, lineY }, GOLD_COLOR);
+            lineY += STATS_LINE_HEIGHT;
+        }
         restartButton.Draw(window, mousePosition);
         gameOverMenuButton.Draw(window, mousePosition);
     }
