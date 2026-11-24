@@ -5,9 +5,9 @@ namespace ReyesCuadra
     // Cantidad de turnos del arranque (antes de que empiece el ciclo que se repite)
     static const int OPENING_TURNS = 2;
 
-    // El ciclo dura 3 turnos: los 2 primeros son combo y el ultimo es el ataque fuerte
+    // El ciclo dura 3 turnos: primero el Cortador de enredos (un solo ataque) y despues 2 turnos de combo con el Tajo
     static const int CYCLE_LENGTH = 3;
-    static const int COMBO_TURNS_PER_CYCLE = 2;
+    static const int TANGLE_CUTTER_TURN_IN_CYCLE = 0;
 
     // Cantidad de cada skill en los turnos de arranque
     static const int OPENING_TRIPLE_SLASHES = 2;
@@ -41,18 +41,18 @@ namespace ReyesCuadra
             return actions;
         }
 
-        // Posicion dentro del ciclo: 0 y 1 son turnos de combo, 2 es el turno del ataque fuerte
+        // Posicion dentro del ciclo: 0 es el turno del Cortador de enredos, 1 y 2 son turnos de combo
         const int turnInCycle = (turn - OPENING_TURNS - 1) % CYCLE_LENGTH;
 
-        if (turnInCycle < COMBO_TURNS_PER_CYCLE)
+        if (turnInCycle == TANGLE_CUTTER_TURN_IN_CYCLE)
+        {
+            actions.push_back(tangleCutter);
+        }
+        else
         {
             AddRepeated(actions, explosiveSlash, COMBO_EXPLOSIVE_SLASHES);
             AddRepeated(actions, tripleSlash, COMBO_TRIPLE_SLASHES);
             AddRepeated(actions, doubleSlash, COMBO_DOUBLE_SLASHES);
-        }
-        else
-        {
-            actions.push_back(tangleCutter);
         }
 
         return actions;

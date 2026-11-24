@@ -88,6 +88,10 @@ namespace ReyesCuadra
     // Prescripto: cuantas skills de la mano se marcan por turno, cuantas cargas hacen falta para el Furioso
     // y cuanto mas pega una skill marcada (+15%)
     static const int MAX_PRESCRIPT_MARKS_PER_TURN = 2;
+
+    // Turno de un solo ataque de Lei Heng (Cortador de enredos): Yi Sang tambien tiene una sola accion
+    static const size_t SINGLE_ENEMY_ACTION = 1;
+    static const int SINGLE_PLAYER_ACTION = 1;
     static const int PRESCRIPT_STACKS_FOR_FURIOSO = 9;
     static const float MARKED_SKILL_DAMAGE_MULTIPLIER = 1.15f;
     static const float NORMAL_PLAYER_DAMAGE_MULTIPLIER = 1.0f;
@@ -253,6 +257,7 @@ namespace ReyesCuadra
         , actionOptionMarked()
         , columnUsesMarkedSkill()
         , prescriptStacks(0)
+        , availableActions(PLAYER_MAX_ACTIONS)
         , playerActions()
         , winChances()
         , columnCoveredByEvade()
@@ -660,12 +665,17 @@ namespace ReyesCuadra
             enemyActions = enemyPattern.GetActionsForTurn(turn);
         }
 
-        // Cada accion de Yi Sang arranca en su columna (accion 1 en la columna 1...) con su primera opcion.
+        // Si Lei Heng tiene un solo ataque, Yi Sang tambien tiene una sola accion
+        availableActions = (enemyActions.size() == SINGLE_ENEMY_ACTION) ? SINGLE_PLAYER_ACTION : PLAYER_MAX_ACTIONS;
+
+        // Cada accion disponible de Yi Sang arranca en su columna (accion 1 en la columna 1...) con su primera opcion.
         // Si esta staggereado, no pone ninguna.
         for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
         {
+            const bool canUseAction = !player.IsStaggered() && actionIndex < availableActions;
+
             actionChoices[static_cast<size_t>(actionIndex)] = 0;
-            actionColumns[static_cast<size_t>(actionIndex)] = player.IsStaggered() ? NO_COLUMN : actionIndex;
+            actionColumns[static_cast<size_t>(actionIndex)] = canUseAction ? actionIndex : NO_COLUMN;
         }
 
         selectedSlot = 0;
@@ -768,9 +778,10 @@ namespace ReyesCuadra
         // Opciones que se pueden marcar: todas las de la mano menos Furioso-Replica (Esquivar no es una opcion de la mano)
         int candidates = 0;
 
-        for (const std::array<int, OPTIONS_PER_ACTION>& options : actionOptions)
+        // (solo en las acciones que se pueden usar este turno)
+        for (int actionIndex = 0; actionIndex < availableActions; actionIndex++)
         {
-            for (int skillIndex : options)
+            for (int skillIndex : actionOptions[static_cast<size_t>(actionIndex)])
             {
                 if (skillIndex != SKILL_FURIOSO)
                 {
@@ -783,7 +794,7 @@ namespace ReyesCuadra
         // asi salen exactamente las marcas pedidas y todas las opciones tienen la misma chance
         int marksLeft = (candidates < MAX_PRESCRIPT_MARKS_PER_TURN) ? candidates : MAX_PRESCRIPT_MARKS_PER_TURN;
 
-        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
+        for (int actionIndex = 0; actionIndex < availableActions; actionIndex++)
         {
             for (int optionIndex = 0; optionIndex < OPTIONS_PER_ACTION; optionIndex++)
             {
@@ -903,7 +914,7 @@ namespace ReyesCuadra
                 }
 
                 button.SetSelected(isPlaced && actionChoices[static_cast<size_t>(actionIndex)] == choiceIndex);
-                button.SetEnabled(!player.IsStaggered());
+                button.SetEnabled(!player.IsStaggered() && actionIndex < availableActions);
             }
         }
     }
@@ -1533,7 +1544,7 @@ namespace ReyesCuadra
         }
         else
         {
-            const std::string hint = "Acciones: " + std::to_string(CountPlayerActions()) + "/" + std::to_string(PLAYER_MAX_ACTIONS) + "  ·  Clic en una columna y después en una skill de abajo  ·  Clic derecho la saca  ·  Sin acción = te pegan directo";
+            const std::string hint = "Acciones: " + std::to_string(CountPlayerActions()) + "/" + std::to_string(availableActions) + "  ·  Clic en una columna y después en una skill de abajo  ·  Clic derecho la saca  ·  Sin acción = te pegan directo";
 
             DrawTextAt(window, font, hint, HINT_SIZE, { SLOTS_LEFT, HINT_Y }, DIM_TEXT_COLOR);
         }
@@ -1621,6 +1632,10 @@ namespace ReyesCuadra
             if (column != NO_COLUMN)
             {
                 header += "  ·  en la columna " + std::to_string(column + 1);
+            }
+            else if (actionIndex >= availableActions)
+            {
+                header += "  ·  no disponible (Lei Heng tiene un solo ataque)";
             }
             else if (!player.IsStaggered())
             {

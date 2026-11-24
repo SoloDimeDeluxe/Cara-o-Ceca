@@ -9,7 +9,7 @@ namespace ReyesCuadra
 {
     // Patron fijo de Lei Heng: decide que skills usa en cada turno
     //   Turnos 1 y 2: 2 Triple Corte - Explosion + 4 Doble Corte - Explosion
-    //   Despues se repite: 2 turnos de (1 Tajo Destrozador Explosivo + 2 Triple Corte + 3 Doble Corte) y 1 turno de Cortador de enredos
+    //   Despues se repite: 1 turno de Cortador de enredos (un solo ataque) y 2 turnos de (1 Tajo Destrozador Explosivo + 2 Triple Corte + 3 Doble Corte)
     class EnemyPattern
     {
     public:

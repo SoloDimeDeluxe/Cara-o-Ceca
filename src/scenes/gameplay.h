@@ -241,6 +241,9 @@ namespace ReyesCuadra
         // Cargas de Prescripto: +1 por cada skill marcada que se usa; con 9 aparece Furioso-Replica
         int prescriptStacks;
 
+        // Acciones que puede usar Yi Sang este turno: 3, o 1 si Lei Heng tiene un solo ataque (Cortador de enredos)
+        int availableActions;
+
         // Lo que hace cada uno en cada slot este turno (nullptr = slot vacio)
         std::array<const Skill*, SLOT_COUNT> playerActions;
         std::vector<const Skill*> enemyActions;
