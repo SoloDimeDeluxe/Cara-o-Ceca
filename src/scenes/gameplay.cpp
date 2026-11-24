@@ -85,6 +85,14 @@ namespace ReyesCuadra
     static const float EVADE_BUTTON_WIDTH = 152.0f;
     static const float HAND_BUTTON_GAP = 8.0f;
 
+    // Prescripto: cuantas skills de la mano se marcan por turno, cuantas cargas hacen falta para el Furioso
+    // y cuanto mas pega una skill marcada (+15%)
+    static const int MAX_PRESCRIPT_MARKS_PER_TURN = 2;
+    static const int PRESCRIPT_STACKS_FOR_FURIOSO = 9;
+    static const float MARKED_SKILL_DAMAGE_MULTIPLIER = 1.15f;
+    static const float NORMAL_PLAYER_DAMAGE_MULTIPLIER = 1.0f;
+    static const float PRESCRIPT_TEXT_WIDTH = 620.0f;
+
     // Probabilidad de que salga cada skill en la mano (S3 es lo que queda: 10%)
     static const float SKILL_1_DRAW_CHANCE = 0.6f;
     static const float SKILL_2_DRAW_CHANCE = 0.3f;
@@ -208,7 +216,7 @@ namespace ReyesCuadra
     static const float SELECTED_BORDER_THICKNESS = 4.0f;
 
     // Etiqueta corta que va delante del nombre de cada skill en los botones (mismo orden que PlayerSkillIndex)
-    static const char* PLAYER_SKILL_TAGS[] = { "S1", "S2", "S3", "Defensa", "S3-2" };
+    static const char* PLAYER_SKILL_TAGS[] = { "S1", "S2", "S3", "Defensa", "Especial" };
 
     // Color segun que tan buena es la chance: verde si es favorable, amarillo si es pareja y rojo si es desfavorable
     static sf::Color GetChanceColor(float winChance);
@@ -236,6 +244,9 @@ namespace ReyesCuadra
         , actionOptions()
         , actionChoices()
         , actionColumns()
+        , actionOptionMarked()
+        , columnUsesMarkedSkill()
+        , prescriptStacks(0)
         , playerActions()
         , winChances()
         , columnCoveredByEvade()
@@ -279,10 +290,8 @@ namespace ReyesCuadra
         playerSkills.push_back(Skill("Regocíjate con aplausos silenciosos, empala en dolor silencioso", "S2: Regocíjate", SkillType::Attack, 4, 3, 4, false));
         playerSkills.push_back(Skill("Alza y ríe la hoja, llora la cascada como el aroma de las hojas caídas", "S3: Alza y ríe la hoja", SkillType::Attack, 4, 4, 3, false));
         playerSkills.push_back(Skill("Por un capricho impredecible", "Esquivar: Por un capricho", SkillType::Evade, 4, 1, 10, false));
-        playerSkills.push_back(Skill("Furioso-Replica", "S3-2: Furioso-Replica", SkillType::Attack, 3, 9, 3, false));
-
-        // Furioso-Replica se desbloquea mas adelante (con la mecanica de las 9 skills seguidas)
-        playerSkills[SKILL_FURIOSO].SetLocked(true);
+        // Furioso-Replica: 9 monedas irrompibles. No sale en el sorteo de la mano: aparece con 9 cargas de Prescripto.
+        playerSkills.push_back(Skill("Furioso-Replica", "Furioso-Replica", SkillType::Attack, 3, 9, 3, true));
 
         // Poise que genera cada skill de Yi Sang (sacado de la wiki, uptie 4). Todas sus skills de ataque ganan
         // +1 de poder por moneda cada 6 de potencia de Poise (maximo +2).
@@ -574,6 +583,9 @@ namespace ReyesCuadra
         combatLog.Clear();
         combatLog.AddLine("Elegí una skill de cada acción de Yi Sang, ponela en la columna que quieras frenar y apretá ¡Combatir!");
 
+        prescriptStacks = 0;
+        player.SetDamageMultiplier(NORMAL_PLAYER_DAMAGE_MULTIPLIER);
+
         DealNewHand();
         PrepareTurn();
     }
@@ -609,6 +621,9 @@ namespace ReyesCuadra
         }
 
         selectedSlot = 0;
+
+        GiveFuriosoIfReady();
+        RollPrescriptMarks();
 
         // Cambio el estado de las unidades (vida, Poise, SP...): las chances viejas ya no sirven
         winChanceCache.clear();
@@ -681,6 +696,7 @@ namespace ReyesCuadra
     void Gameplay::RebuildPlayerActions()
     {
         playerActions.fill(nullptr);
+        columnUsesMarkedSkill.fill(false);
 
         for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
         {
@@ -689,8 +705,112 @@ namespace ReyesCuadra
             if (column != NO_COLUMN)
             {
                 playerActions[static_cast<size_t>(column)] = GetActionSkill(actionIndex);
+                columnUsesMarkedSkill[static_cast<size_t>(column)] = IsActionUsingMarkedOption(actionIndex);
             }
         }
+    }
+
+    void Gameplay::RollPrescriptMarks()
+    {
+        for (std::array<bool, OPTIONS_PER_ACTION>& marks : actionOptionMarked)
+        {
+            marks.fill(false);
+        }
+
+        // Opciones que se pueden marcar: todas las de la mano menos Furioso-Replica (Esquivar no es una opcion de la mano)
+        int candidates = 0;
+
+        for (const std::array<int, OPTIONS_PER_ACTION>& options : actionOptions)
+        {
+            for (int skillIndex : options)
+            {
+                if (skillIndex != SKILL_FURIOSO)
+                {
+                    candidates++;
+                }
+            }
+        }
+
+        // Se recorren las opciones en orden y cada una se marca con chance (marcas que faltan / opciones que quedan):
+        // asi salen exactamente las marcas pedidas y todas las opciones tienen la misma chance
+        int marksLeft = (candidates < MAX_PRESCRIPT_MARKS_PER_TURN) ? candidates : MAX_PRESCRIPT_MARKS_PER_TURN;
+
+        for (int actionIndex = 0; actionIndex < PLAYER_MAX_ACTIONS; actionIndex++)
+        {
+            for (int optionIndex = 0; optionIndex < OPTIONS_PER_ACTION; optionIndex++)
+            {
+                if (actionOptions[static_cast<size_t>(actionIndex)][static_cast<size_t>(optionIndex)] == SKILL_FURIOSO)
+                {
+                    continue;
+                }
+
+                if (marksLeft > 0 && RollChance(static_cast<float>(marksLeft) / static_cast<float>(candidates)))
+                {
+                    actionOptionMarked[static_cast<size_t>(actionIndex)][static_cast<size_t>(optionIndex)] = true;
+                    marksLeft--;
+                }
+
+                candidates--;
+            }
+        }
+    }
+
+    bool Gameplay::IsActionUsingMarkedOption(int actionIndex) const
+    {
+        const int choice = actionChoices[static_cast<size_t>(actionIndex)];
+
+        // Esquivar nunca esta marcado
+        if (choice >= OPTIONS_PER_ACTION)
+        {
+            return false;
+        }
+
+        return actionOptionMarked[static_cast<size_t>(actionIndex)][static_cast<size_t>(choice)];
+    }
+
+    void Gameplay::GiveFuriosoIfReady()
+    {
+        if (prescriptStacks < PRESCRIPT_STACKS_FOR_FURIOSO || HandHasFurioso())
+        {
+            return;
+        }
+
+        // La copia de Furioso-Replica reemplaza una S1 de la mano (la mas comun); si no hay ninguna, la primera opcion
+        size_t targetAction = 0;
+        size_t targetOption = 0;
+        bool foundSkill1 = false;
+
+        for (size_t actionIndex = 0; actionIndex < actionOptions.size() && !foundSkill1; actionIndex++)
+        {
+            for (size_t optionIndex = 0; optionIndex < actionOptions[actionIndex].size() && !foundSkill1; optionIndex++)
+            {
+                if (actionOptions[actionIndex][optionIndex] == SKILL_1)
+                {
+                    targetAction = actionIndex;
+                    targetOption = optionIndex;
+                    foundSkill1 = true;
+                }
+            }
+        }
+
+        actionOptions[targetAction][targetOption] = SKILL_FURIOSO;
+        combatLog.AddLine("¡Prescripto completo! Furioso-Replica aparece en la mano de Yi Sang (una sola vez).");
+    }
+
+    bool Gameplay::HandHasFurioso() const
+    {
+        for (const std::array<int, OPTIONS_PER_ACTION>& options : actionOptions)
+        {
+            for (int skillIndex : options)
+            {
+                if (skillIndex == SKILL_FURIOSO)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     void Gameplay::AssignAction(int actionIndex, int choiceIndex)
@@ -731,6 +851,7 @@ namespace ReyesCuadra
 
                     button.SetLabel(skill.GetShortName());
                     button.SetSubLabel(skill.GetSummary());
+                    button.SetMarked(actionOptionMarked[static_cast<size_t>(actionIndex)][static_cast<size_t>(choiceIndex)]);
                 }
 
                 button.SetSelected(isPlaced && actionChoices[static_cast<size_t>(actionIndex)] == choiceIndex);
@@ -865,7 +986,33 @@ namespace ReyesCuadra
                 playerSkill = activeEvade;
             }
 
+            // Skill marcada por el Prescripto: pega +15% y da 1 carga (el Furioso las gasta todas)
+            const bool usesMarkedSkill = !usesActiveEvade && playerSkill != nullptr && columnUsesMarkedSkill[static_cast<size_t>(slotIndex)];
+            const bool usesFurioso = !usesActiveEvade && playerSkill == &playerSkills[SKILL_FURIOSO];
+
+            player.SetDamageMultiplier(usesMarkedSkill ? MARKED_SKILL_DAMAGE_MULTIPLIER : NORMAL_PLAYER_DAMAGE_MULTIPLIER);
+
             const bool evadeHeld = ResolveColumn(player, playerSkill, enemy, enemySkill, timeline);
+
+            player.SetDamageMultiplier(NORMAL_PLAYER_DAMAGE_MULTIPLIER);
+
+            if (usesMarkedSkill && prescriptStacks < PRESCRIPT_STACKS_FOR_FURIOSO)
+            {
+                prescriptStacks++;
+                timeline.AddLogLine("Yi Sang cumple el Prescripto (+15% de daño): " + std::to_string(prescriptStacks) + "/" + std::to_string(PRESCRIPT_STACKS_FOR_FURIOSO) + ".");
+
+                if (prescriptStacks >= PRESCRIPT_STACKS_FOR_FURIOSO)
+                {
+                    timeline.AddBanner("¡PRESCRIPTO COMPLETO!");
+                }
+            }
+
+            if (usesFurioso)
+            {
+                prescriptStacks = 0;
+                timeline.AddLogLine("Yi Sang usó Furioso-Replica: el Prescripto vuelve a 0.");
+            }
+
             const bool usedEvade = playerSkill != nullptr && playerSkill->GetType() == SkillType::Evade;
 
             // La esquiva queda activa si aguanto; si la superaron, se pierde
@@ -1422,6 +1569,10 @@ namespace ReyesCuadra
             DrawTextAt(window, font, header, HAND_HEADER_SIZE, { MARGIN, headerY }, column != NO_COLUMN ? GOLD_COLOR : DIM_TEXT_COLOR);
         }
 
+        // A la derecha del titulo de la primera fila: cuantas cargas de Prescripto tiene Yi Sang
+        const std::string prescriptText = HandHasFurioso() ? "Prescripto: ¡Furioso-Replica en la mano!" : "Prescripto: " + std::to_string(prescriptStacks) + "/" + std::to_string(PRESCRIPT_STACKS_FOR_FURIOSO) + "  (rombo = skill marcada)";
+        DrawTextRightAligned(window, font, prescriptText, HAND_HEADER_SIZE, { MARGIN + PRESCRIPT_TEXT_WIDTH, SKILL_BUTTONS_TOP }, GOLD_COLOR);
+
         for (const Button& button : skillButtons)
         {
             button.Draw(window, mousePosition);
@@ -1438,7 +1589,13 @@ namespace ReyesCuadra
                 const size_t actionIndex = buttonIndex / static_cast<size_t>(BUTTONS_PER_ACTION);
                 const size_t choiceIndex = buttonIndex % static_cast<size_t>(BUTTONS_PER_ACTION);
                 const size_t skillIndex = (choiceIndex < static_cast<size_t>(OPTIONS_PER_ACTION)) ? static_cast<size_t>(actionOptions[actionIndex][choiceIndex]) : static_cast<size_t>(SKILL_DEFENSE);
-                const std::string title = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + playerSkills[skillIndex].GetName();
+                std::string title = std::string(PLAYER_SKILL_TAGS[skillIndex]) + " · " + playerSkills[skillIndex].GetName();
+
+                // Si es una opcion con la Marca del Prescripto, se avisa que pega mas y da una carga
+                if (choiceIndex < static_cast<size_t>(OPTIONS_PER_ACTION) && actionOptionMarked[actionIndex][choiceIndex])
+                {
+                    title += "  (Marca del Prescripto: +15% de daño y +1 carga)";
+                }
 
                 DrawSkillDetails(window, playerSkills[skillIndex], title);
                 return;

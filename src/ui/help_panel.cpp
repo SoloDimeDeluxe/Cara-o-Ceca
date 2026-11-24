@@ -10,8 +10,8 @@ namespace ReyesCuadra
     static const sf::Vector2f BOX_SIZE = { 940.0f, 700.0f };
     static const float PADDING = 30.0f;
     static const float TITLE_HEIGHT = 50.0f;
-    static const float LINE_HEIGHT = 20.0f;
-    static const float RULE_GAP = 6.0f;
+    static const float LINE_HEIGHT = 19.0f;
+    static const float RULE_GAP = 4.0f;
     static const sf::Vector2f CLOSE_BUTTON_SIZE = { 220.0f, 48.0f };
     static const float BORDER_THICKNESS = 2.0f;
 
@@ -38,7 +38,8 @@ namespace ReyesCuadra
         "8. Cordura (SP): va de -45 a +45 y cambia la chance de sacar cara: 50% + SP. Ganar un clash da +10 SP (más si duró varias rondas). Pasá el mouse por una skill para ver todos sus efectos (también las de Lei Heng).",
         "9. Stagger: las marcas en las barras de vida son umbrales. Si la vida baja de uno, esa unidad queda staggereada: pierde lo que le quedaba del turno, no actúa el turno siguiente y mientras tanto recibe el doble de daño.",
         "10. Tremor: las skills de Lei Heng se lo ponen a Yi Sang y la cantidad baja 1 al final de cada turno. Varias skills hacen Tremor Burst: tu próximo umbral de Stagger sube tantos puntos como la potencia de Tremor, así te staggerea antes. Si Lei Heng no pierde el clash, Tajo y Cortador lo vuelven Tremor - Scorch: cada Burst además te hace (Tremor + Burn) / 2 de daño y baja 1 la cantidad de los dos.",
-        "11. Burn: Lei Heng también te quema. Al final de cada turno recibís daño fijo igual a la potencia y la cantidad baja 1. Sus skills pegan más fuerte cuanto más Burn + Tremor tengas. Abajo de las barras, los estados se muestran como potencia·cantidad."
+        "11. Burn: Lei Heng también te quema. Al final de cada turno recibís daño fijo igual a la potencia y la cantidad baja 1. Sus skills pegan más fuerte cuanto más Burn + Tremor tengas. Abajo de las barras, los estados se muestran como potencia·cantidad.",
+        "12. Prescripto: cada turno se marcan hasta 2 skills de tu mano (rombo dorado). Si usás una marcada pega +15% y ganás 1 carga. Con 9 cargas aparece Furioso-Replica en tu mano: 9 monedas irrompibles, una sola vez."
     };
 
     HelpPanel::HelpPanel(const sf::Font& panelFont, sf::Vector2f panelScreenSize)

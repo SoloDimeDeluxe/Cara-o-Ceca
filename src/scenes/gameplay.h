@@ -110,6 +110,18 @@ namespace ReyesCuadra
         // Pone la accion de Yi Sang en la columna seleccionada con la opcion elegida (o Esquivar)
         void AssignAction(int actionIndex, int choiceIndex);
 
+        // Prescripto: marca hasta 2 skills al azar de la mano (nunca Esquivar ni Furioso-Replica)
+        void RollPrescriptMarks();
+
+        // true si la opcion de esa accion tiene la Marca del Prescripto y ademas es la elegida
+        bool IsActionUsingMarkedOption(int actionIndex) const;
+
+        // Con 9 cargas de Prescripto, pone una copia de Furioso-Replica en la mano (si todavia no esta)
+        void GiveFuriosoIfReady();
+
+        // true si alguna opcion de la mano es Furioso-Replica
+        bool HandHasFurioso() const;
+
         // Cambia los textos de los botones de la mano (nombre de cada opcion sorteada) y marca la elegida
         void RefreshHandButtons();
 
@@ -213,6 +225,15 @@ namespace ReyesCuadra
 
         // Columna donde esta puesta cada accion (-1 = no se usa este turno)
         std::array<int, PLAYER_MAX_ACTIONS> actionColumns;
+
+        // Que opciones de la mano tienen la Marca del Prescripto este turno
+        std::array<std::array<bool, OPTIONS_PER_ACTION>, PLAYER_MAX_ACTIONS> actionOptionMarked;
+
+        // Columnas donde Yi Sang usa una skill marcada (se arma junto con playerActions)
+        std::array<bool, SLOT_COUNT> columnUsesMarkedSkill;
+
+        // Cargas de Prescripto: +1 por cada skill marcada que se usa; con 9 aparece Furioso-Replica
+        int prescriptStacks;
 
         // Lo que hace cada uno en cada slot este turno (nullptr = slot vacio)
         std::array<const Skill*, SLOT_COUNT> playerActions;

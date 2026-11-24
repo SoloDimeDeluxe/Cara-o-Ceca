@@ -33,6 +33,9 @@ namespace ReyesCuadra
         // Un boton seleccionado se dibuja con el borde dorado (por ejemplo, la skill elegida para una accion)
         void SetSelected(bool selected);
 
+        // Un boton marcado lleva un rombo dorado en la esquina de arriba a la derecha (la Marca del Prescripto)
+        void SetMarked(bool marked);
+
         // Dibuja el boton, resaltado si el mouse esta encima
         void Draw(sf::RenderWindow& window, sf::Vector2f mousePosition) const;
 
@@ -45,6 +48,7 @@ namespace ReyesCuadra
         sf::Color rightTextColor;
         bool isEnabled;
         bool isSelected;
+        bool isMarked;
     };
 }
 

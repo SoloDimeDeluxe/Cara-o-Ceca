@@ -1,5 +1,7 @@
 #include "ui/button.h"
 
+#include <cstddef>
+
 #include "ui/text_utils.h"
 
 namespace ReyesCuadra
@@ -14,12 +16,18 @@ namespace ReyesCuadra
     static const float BORDER_THICKNESS = 2.0f;
     static const float SELECTED_BORDER_THICKNESS = 4.0f;
 
+    // Rombo de la marca: tamano y distancia a la esquina
+    static const float MARK_RADIUS = 6.0f;
+    static const float MARK_MARGIN = 4.0f;
+    static const std::size_t MARK_POINT_COUNT = 4;
+
     // Colores segun el estado del boton
     static const sf::Color NORMAL_COLOR = sf::Color(45, 40, 48);
     static const sf::Color HOVER_COLOR = sf::Color(70, 60, 72);
     static const sf::Color DISABLED_COLOR = sf::Color(32, 30, 34);
     static const sf::Color BORDER_COLOR = sf::Color(120, 100, 80);
     static const sf::Color SELECTED_BORDER_COLOR = sf::Color(220, 190, 120);
+    static const sf::Color MARK_COLOR = sf::Color(240, 200, 90);
     static const sf::Color LABEL_COLOR = sf::Color(235, 230, 220);
     static const sf::Color SUB_LABEL_COLOR = sf::Color(180, 170, 155);
     static const sf::Color DISABLED_TEXT_COLOR = sf::Color(100, 95, 90);
@@ -33,6 +41,7 @@ namespace ReyesCuadra
         , rightTextColor(LABEL_COLOR)
         , isEnabled(true)
         , isSelected(false)
+        , isMarked(false)
     {
     }
 
@@ -54,6 +63,11 @@ namespace ReyesCuadra
     void Button::SetSelected(bool selected)
     {
         isSelected = selected;
+    }
+
+    void Button::SetMarked(bool marked)
+    {
+        isMarked = marked;
     }
 
     void Button::SetLabel(const std::string& text)
@@ -104,6 +118,16 @@ namespace ReyesCuadra
         {
             DrawTextAt(window, font, label, LABEL_SIZE, { bounds.position.x + TEXT_PADDING_X, bounds.position.y + LABEL_OFFSET_Y }, labelColor);
             DrawTextAt(window, font, subLabel, SUB_LABEL_SIZE, { bounds.position.x + TEXT_PADDING_X, bounds.position.y + SUB_LABEL_OFFSET_Y }, subLabelColor);
+        }
+
+        // La marca es un circulo de 4 puntas (un rombo) en la esquina de arriba a la derecha
+        if (isMarked)
+        {
+            sf::CircleShape mark(MARK_RADIUS, MARK_POINT_COUNT);
+            mark.setOrigin({ MARK_RADIUS, MARK_RADIUS });
+            mark.setPosition({ bounds.position.x + bounds.size.x - MARK_MARGIN - MARK_RADIUS, bounds.position.y + MARK_MARGIN + MARK_RADIUS });
+            mark.setFillColor(MARK_COLOR);
+            window.draw(mark);
         }
 
         // El texto de la derecha va centrado en altura, pegado al borde derecho
