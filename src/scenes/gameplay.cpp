@@ -21,7 +21,10 @@ namespace ReyesCuadra
     static const sf::Color ENEMY_COLOR = sf::Color(170, 60, 50);
 
     // Umbrales de Stagger (proporcion de la vida maxima): Yi Sang a la mitad, Lei Heng al 70% y al 20%
-    static const float PLAYER_STAGGER_THRESHOLD = 0.5f;
+    static const float PLAYER_STAGGER_THRESHOLD = 0.2f;
+
+    // Cada tantos turnos, si la cordura de Lei Heng esta en negativo, vuelve a 0 (si no, el Sinking la deja clavada en -45)
+    static const int ENEMY_SANITY_RESET_INTERVAL = 3;
     static const float ENEMY_FIRST_STAGGER_THRESHOLD = 0.7f;
     static const float ENEMY_SECOND_STAGGER_THRESHOLD = 0.2f;
 
@@ -1128,6 +1131,13 @@ namespace ReyesCuadra
         if (enemy.UpdateStaggerOnTurnEnd())
         {
             timeline.AddLogLine("Lei Heng se recupera del Stagger.");
+        }
+
+        // Cada 3 turnos Lei Heng recupera la compostura: si su SP esta en negativo, vuelve a 0
+        if (turn % ENEMY_SANITY_RESET_INTERVAL == 0 && enemy.GetSanity() < 0)
+        {
+            enemy.ChangeSanity(-enemy.GetSanity());
+            timeline.AddLogLine("Lei Heng recupera la compostura: su SP vuelve a 0.");
         }
 
         // Como queda la partida cuando termine de mostrarse el turno
