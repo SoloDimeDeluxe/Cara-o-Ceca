@@ -95,10 +95,10 @@ namespace ReyesCuadra
             {
                 const MenuAction action = menu.HandleEvent(*event);
 
-                if (action == MenuAction::Play)
+                if (action == MenuAction::Play || action == MenuAction::PlayHard)
                 {
-                    // Cada vez que se entra desde el menu arranca una partida nueva
-                    gameplay.StartNewGame();
+                    // Cada vez que se entra desde el menu arranca una partida nueva (normal o en Dificil)
+                    gameplay.StartNewGame(action == MenuAction::PlayHard);
                     currentScene = Scene::Battle;
                 }
                 else if (action == MenuAction::Exit)

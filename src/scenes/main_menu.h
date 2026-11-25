@@ -13,6 +13,7 @@ namespace ReyesCuadra
     {
         None,
         Play,
+        PlayHard,
         Exit
     };
 
@@ -41,6 +42,7 @@ namespace ReyesCuadra
         const sf::Font& font;
 
         Button playButton;
+        Button playHardButton;
         Button helpButton;
         Button creditsButton;
         Button exitButton;

@@ -27,6 +27,8 @@ namespace ReyesCuadra
         , maxHp(unitMaxHp)
         , hp(unitMaxHp)
         , sanity(STARTING_SANITY)
+        , minSanity(MIN_SANITY)
+        , maxSanity(MAX_SANITY)
         , color(unitColor)
         , brokenThresholds(0)
         , staggerTurnEndsLeft(0)
@@ -199,21 +201,35 @@ namespace ReyesCuadra
 
     bool Unit::IsAtMinSanity() const
     {
-        return sanity <= MIN_SANITY;
+        return sanity <= minSanity;
     }
 
     void Unit::ChangeSanity(int amount)
     {
         sanity += amount;
 
-        if (sanity < MIN_SANITY)
+        if (sanity < minSanity)
         {
-            sanity = MIN_SANITY;
+            sanity = minSanity;
         }
-        else if (sanity > MAX_SANITY)
+        else if (sanity > maxSanity)
         {
-            sanity = MAX_SANITY;
+            sanity = maxSanity;
         }
+    }
+
+    void Unit::SetSanityLimits(int minimum, int maximum)
+    {
+        minSanity = minimum;
+        maxSanity = maximum;
+
+        // Si la cordura actual quedo afuera de los limites nuevos, se acomoda
+        ChangeSanity(0);
+    }
+
+    void Unit::ResetSanityLimits()
+    {
+        SetSanityLimits(MIN_SANITY, MAX_SANITY);
     }
 
     float Unit::GetHeadsChance() const

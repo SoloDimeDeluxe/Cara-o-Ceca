@@ -27,8 +27,8 @@ namespace ReyesCuadra
 
     // Botones, uno abajo del otro
     static const sf::Vector2f BUTTON_SIZE = { 320.0f, 56.0f };
-    static const float FIRST_BUTTON_Y = 330.0f;
-    static const float BUTTON_GAP = 16.0f;
+    static const float FIRST_BUTTON_Y = 316.0f;
+    static const float BUTTON_GAP = 12.0f;
 
     // Texto de abajo de todo
     static const float FOOTER_Y = 680.0f;
@@ -82,6 +82,7 @@ namespace ReyesCuadra
     enum MenuButtonIndex
     {
         PLAY_BUTTON = 0,
+        PLAY_HARD_BUTTON,
         HELP_BUTTON,
         CREDITS_BUTTON,
         EXIT_BUTTON
@@ -93,6 +94,7 @@ namespace ReyesCuadra
     MainMenu::MainMenu(const sf::Font& menuFont)
         : font(menuFont)
         , playButton(menuFont, GetButtonBounds(PLAY_BUTTON), "Jugar", "")
+        , playHardButton(menuFont, GetButtonBounds(PLAY_HARD_BUTTON), "Jugar en Difícil", "")
         , helpButton(menuFont, GetButtonBounds(HELP_BUTTON), "Cómo se juega", "")
         , creditsButton(menuFont, GetButtonBounds(CREDITS_BUTTON), "Créditos", "")
         , exitButton(menuFont, GetButtonBounds(EXIT_BUTTON), "Salir", "")
@@ -153,6 +155,11 @@ namespace ReyesCuadra
             return MenuAction::Play;
         }
 
+        if (playHardButton.Contains(clickPosition))
+        {
+            return MenuAction::PlayHard;
+        }
+
         if (helpButton.Contains(clickPosition))
         {
             helpPanel.Open();
@@ -192,6 +199,7 @@ namespace ReyesCuadra
         window.draw(enemyPortrait);
 
         playButton.Draw(window, mousePosition);
+        playHardButton.Draw(window, mousePosition);
         helpButton.Draw(window, mousePosition);
         creditsButton.Draw(window, mousePosition);
         exitButton.Draw(window, mousePosition);

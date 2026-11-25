@@ -82,8 +82,9 @@ namespace ReyesCuadra
         // Recibe los eventos de la ventana (movimiento y clics del mouse, y Esc para pausar)
         void HandleEvent(const sf::Event& event);
 
-        // Deja todo como al principio: vida llena, turno 1 y registro vacio (se llama al apretar Jugar en el menu)
-        void StartNewGame();
+        // Deja todo como al principio: vida llena, turno 1 y registro vacio (se llama al apretar Jugar en el menu).
+        // En modo Dificil, Yi Sang tiene como maximo +20 de SP y Lei Heng nunca baja de 0.
+        void StartNewGame(bool hardMode);
 
         // Devuelve true una sola vez si el jugador eligio volver al menu principal (desde la pausa o el fin de partida)
         bool ConsumeReturnToMenuRequest();
@@ -368,6 +369,9 @@ namespace ReyesCuadra
 
         // Estadisticas de la partida (se muestran al ganar o perder)
         GameStats stats;
+
+        // Partida en modo Dificil
+        bool isHardMode;
 
         // Iconos de la cara de cada uno (arriba, al lado de las barras de vida)
         sf::Texture playerPortrait;

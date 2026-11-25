@@ -62,6 +62,12 @@ namespace ReyesCuadra
         // Suma o resta cordura, sin pasarse de los limites
         void ChangeSanity(int amount);
 
+        // Cambia los limites de la cordura (normalmente -45 y +45; el modo Dificil los cambia)
+        void SetSanityLimits(int minimum, int maximum);
+
+        // Vuelve a los limites normales de cordura (-45 y +45)
+        void ResetSanityLimits();
+
         // Chance de sacar cara en cada moneda segun la cordura: 50% + SP% (con 45 de SP es 95%, con -45 es 5%)
         float GetHeadsChance() const;
 
@@ -99,6 +105,8 @@ namespace ReyesCuadra
         int maxHp;
         int hp;
         int sanity;
+        int minSanity;
+        int maxSanity;
         sf::Color color;
         std::vector<float> staggerThresholds;
         size_t brokenThresholds;

@@ -26,6 +26,12 @@ namespace ReyesCuadra
 
     // Cada tantos turnos, si la cordura de Lei Heng esta en negativo, vuelve a 0 (si no, el Sinking la deja clavada en -45)
     static const int ENEMY_SANITY_RESET_INTERVAL = 3;
+
+    // Modo Dificil: limites de cordura de cada uno
+    static const int HARD_PLAYER_MIN_SANITY = -45;
+    static const int HARD_PLAYER_MAX_SANITY = 20;
+    static const int HARD_ENEMY_MIN_SANITY = 0;
+    static const int HARD_ENEMY_MAX_SANITY = 45;
     static const float ENEMY_FIRST_STAGGER_THRESHOLD = 0.7f;
     static const float ENEMY_SECOND_STAGGER_THRESHOLD = 0.2f;
 
@@ -333,6 +339,7 @@ namespace ReyesCuadra
         , shakeTimeLeft(0.0f)
         , arena(gameFont, sf::FloatRect({ MARGIN, SKILL_BUTTONS_TOP }, { SKILL_BUTTON_WIDTH, FIGHT_BUTTON_Y - ARENA_BOTTOM_GAP - SKILL_BUTTONS_TOP }), PLAYER_COLOR, ENEMY_COLOR)
         , stats()
+        , isHardMode(false)
         , playerPortrait()
         , enemyPortrait()
         , isPlayerPortraitLoaded(false)
@@ -481,7 +488,7 @@ namespace ReyesCuadra
         tangleCutter.SetTargetStatusEffects(tangleCutterEffects);
 
 
-        StartNewGame();
+        StartNewGame(false);
     }
 
     void Gameplay::HandleEvent(const sf::Event& event)
@@ -790,8 +797,9 @@ namespace ReyesCuadra
         helpPanel.Draw(window, mousePosition);
     }
 
-    void Gameplay::StartNewGame()
+    void Gameplay::StartNewGame(bool hardMode)
     {
+        isHardMode = hardMode;
         isPaused = false;
         returnToMenuRequested = false;
         helpPanel.Close();
@@ -799,6 +807,18 @@ namespace ReyesCuadra
         player.Reset();
         enemy.Reset();
         stats = GameStats();
+
+        // Limites de cordura: en Dificil, Yi Sang llega como mucho a +20 y Lei Heng nunca baja de 0
+        if (isHardMode)
+        {
+            player.SetSanityLimits(HARD_PLAYER_MIN_SANITY, HARD_PLAYER_MAX_SANITY);
+            enemy.SetSanityLimits(HARD_ENEMY_MIN_SANITY, HARD_ENEMY_MAX_SANITY);
+        }
+        else
+        {
+            player.ResetSanityLimits();
+            enemy.ResetSanityLimits();
+        }
         turn = 1;
         state = GameState::ChoosingSkills;
 
@@ -1582,7 +1602,7 @@ namespace ReyesCuadra
         {
             if (restartButton.Contains(clickPosition))
             {
-                StartNewGame();
+                StartNewGame(isHardMode);
                 clickCooldownClock.restart();
             }
             else if (gameOverMenuButton.Contains(clickPosition))
@@ -1784,11 +1804,12 @@ namespace ReyesCuadra
 
         // Numero de turno en el medio de la pantalla
         const sf::FloatRect turnArea({ 0.0f, TURN_LABEL_Y }, { SCREEN_WIDTH, static_cast<float>(TURN_SIZE) });
-        DrawTextCentered(window, font, "Turno " + std::to_string(turn), TURN_SIZE, turnArea, GOLD_COLOR);
+        // En Dificil el turno va en rojo y la linea de abajo lo dice
+        DrawTextCentered(window, font, "Turno " + std::to_string(turn), TURN_SIZE, turnArea, isHardMode ? UNFAVORABLE_COLOR : GOLD_COLOR);
 
         // Abajo del turno, que tan fuerte esta pegando Lei Heng (en rojo cuando ya pega con todo)
         const float enemyStrength = enemy.GetDamageMultiplier();
-        const std::string strengthText = "Fuerza de Lei Heng: " + FormatPercent(enemyStrength);
+        const std::string strengthText = std::string(isHardMode ? "Difícil · " : "") + "Fuerza de Lei Heng: " + FormatPercent(enemyStrength);
         const sf::FloatRect strengthArea({ 0.0f, STRENGTH_LABEL_Y }, { SCREEN_WIDTH, static_cast<float>(STRENGTH_LABEL_SIZE) });
 
         DrawTextCentered(window, font, strengthText, STRENGTH_LABEL_SIZE, strengthArea, (enemyStrength >= ENEMY_MAX_STRENGTH) ? UNFAVORABLE_COLOR : DIM_TEXT_COLOR);
