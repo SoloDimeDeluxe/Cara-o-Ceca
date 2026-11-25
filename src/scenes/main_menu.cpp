@@ -75,7 +75,8 @@ namespace ReyesCuadra
         "Desarrollo de Videojuegos I - Image Campus, 2026",
         "Juego de fans inspirado en el combate de Limbus Company. Yi Sang, Lei Heng y sus skills pertenecen a Project Moon.",
         "Hecho en C++ con SFML 3.1.",
-        "Fuente: Crimson Text (SIL Open Font License)."
+        "Fuente: Crimson Text (SIL Open Font License).",
+        "Música: tema de batalla del Canto VIII (jefe 2) de Limbus Company, de Project Moon. Tecla M: silenciar."
     };
 
     // Orden de los botones, de arriba hacia abajo
@@ -130,6 +131,11 @@ namespace ReyesCuadra
                 helpPanel.Close();
                 isShowingCredits = false;
             }
+            else
+            {
+                // Las flechas cambian de pagina en la ayuda (si no esta abierta, no hace nada)
+                helpPanel.HandleKey(key->code);
+            }
         }
 
         return MenuAction::None;
@@ -137,13 +143,14 @@ namespace ReyesCuadra
 
     MenuAction MainMenu::HandleClick(sf::Vector2f clickPosition)
     {
-        // Con un cartel abierto, cualquier clic lo cierra
+        // Con la ayuda abierta, los clics son para el cartel (pestanas, flechas o cerrar)
         if (helpPanel.IsOpen())
         {
-            helpPanel.Close();
+            helpPanel.HandleClick(clickPosition);
             return MenuAction::None;
         }
 
+        // Con los creditos abiertos, cualquier clic los cierra
         if (isShowingCredits)
         {
             isShowingCredits = false;

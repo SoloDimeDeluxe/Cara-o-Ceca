@@ -3,6 +3,7 @@
 #include <iostream>
 #include <optional>
 
+#include <SFML/Audio.hpp>
 #include <SFML/Graphics.hpp>
 
 #include "scenes/gameplay.h"
@@ -23,6 +24,14 @@ namespace ReyesCuadra
     // Ruta de la fuente que usan todos los textos del juego
     static const char* FONT_PATH = "res/fonts/CrimsonText-SemiBold.ttf";
 
+    // Musica de la batalla: se repite en loop mientras dura la pelea y se corta al volver al menu
+    static const char* BATTLE_MUSIC_PATH = "res/music/battle_theme.ogg";
+    static const float MUSIC_VOLUME = 35.0f;
+    static const float MUTED_VOLUME = 0.0f;
+
+    // Tecla para silenciar o volver a prender la musica (anda en cualquier pantalla)
+    static const sf::Keyboard::Key MUTE_KEY = sf::Keyboard::Key::M;
+
     // Pantalla que se esta mostrando
     enum class Scene
     {
@@ -30,9 +39,26 @@ namespace ReyesCuadra
         Battle
     };
 
-    // Procesa los eventos de la ventana: la cruz la cierra y el resto se lo pasa a la escena actual
+    // Musica de fondo de la pelea. Si el archivo no esta, el juego anda igual pero en silencio.
+    struct BattleMusic
+    {
+        sf::Music music;
+        bool isLoaded = false;
+        bool isMuted = false;
+    };
+
+    // Procesa los eventos de la ventana: la cruz la cierra, la M silencia la musica y el resto se lo pasa a la escena actual
     // (el menu puede pedir empezar a jugar o salir)
-    static void HandleWindowEvents(sf::RenderWindow& window, Scene& currentScene, MainMenu& menu, Gameplay& gameplay);
+    static void HandleWindowEvents(sf::RenderWindow& window, Scene& currentScene, MainMenu& menu, Gameplay& gameplay, BattleMusic& battleMusic);
+
+    // Arranca la musica desde el principio (se llama al entrar a la pelea desde el menu)
+    static void PlayBattleMusic(BattleMusic& battleMusic);
+
+    // Corta la musica (al volver al menu)
+    static void StopBattleMusic(BattleMusic& battleMusic);
+
+    // Silencia la musica o la vuelve a prender
+    static void ToggleMute(BattleMusic& battleMusic);
 
     // Limpia la pantalla, dibuja la escena actual y muestra el frame
     static void DrawFrame(sf::RenderWindow& window, Scene currentScene, const MainMenu& menu, const Gameplay& gameplay);
@@ -55,6 +81,20 @@ namespace ReyesCuadra
         MainMenu menu(font);
         Gameplay gameplay(font);
 
+        // La musica se lee de a pedazos desde el archivo (no se carga entera en memoria)
+        BattleMusic battleMusic;
+        battleMusic.isLoaded = battleMusic.music.openFromFile(BATTLE_MUSIC_PATH);
+
+        if (battleMusic.isLoaded)
+        {
+            battleMusic.music.setLooping(true);
+            battleMusic.music.setVolume(MUSIC_VOLUME);
+        }
+        else
+        {
+            std::cerr << "No se pudo cargar la musica: " << BATTLE_MUSIC_PATH << std::endl;
+        }
+
         // El juego arranca en el menu principal
         Scene currentScene = Scene::Menu;
 
@@ -65,7 +105,7 @@ namespace ReyesCuadra
         {
             const float deltaSeconds = frameClock.restart().asSeconds();
 
-            HandleWindowEvents(window, currentScene, menu, gameplay);
+            HandleWindowEvents(window, currentScene, menu, gameplay, battleMusic);
 
             if (currentScene == Scene::Battle)
             {
@@ -75,6 +115,7 @@ namespace ReyesCuadra
                 if (gameplay.ConsumeReturnToMenuRequest())
                 {
                     currentScene = Scene::Menu;
+                    StopBattleMusic(battleMusic);
                 }
             }
 
@@ -82,7 +123,7 @@ namespace ReyesCuadra
         }
     }
 
-    static void HandleWindowEvents(sf::RenderWindow& window, Scene& currentScene, MainMenu& menu, Gameplay& gameplay)
+    static void HandleWindowEvents(sf::RenderWindow& window, Scene& currentScene, MainMenu& menu, Gameplay& gameplay, BattleMusic& battleMusic)
     {
         // En SFML 3 pollEvent devuelve un std::optional: queda vacio cuando ya no hay mas eventos
         while (const std::optional<sf::Event> event = window.pollEvent())
@@ -90,6 +131,10 @@ namespace ReyesCuadra
             if (event->is<sf::Event::Closed>())
             {
                 window.close();
+            }
+            else if (const sf::Event::KeyPressed* keyPressed = event->getIf<sf::Event::KeyPressed>(); keyPressed != nullptr && keyPressed->code == MUTE_KEY)
+            {
+                ToggleMute(battleMusic);
             }
             else if (currentScene == Scene::Menu)
             {
@@ -100,6 +145,7 @@ namespace ReyesCuadra
                     // Cada vez que se entra desde el menu arranca una partida nueva (normal o en Dificil)
                     gameplay.StartNewGame(action == MenuAction::PlayHard);
                     currentScene = Scene::Battle;
+                    PlayBattleMusic(battleMusic);
                 }
                 else if (action == MenuAction::Exit)
                 {
@@ -110,6 +156,36 @@ namespace ReyesCuadra
             {
                 gameplay.HandleEvent(*event);
             }
+        }
+    }
+
+    static void PlayBattleMusic(BattleMusic& battleMusic)
+    {
+        if (!battleMusic.isLoaded)
+        {
+            return;
+        }
+
+        // stop() la vuelve al principio, asi cada partida nueva arranca con la cancion desde cero
+        battleMusic.music.stop();
+        battleMusic.music.play();
+    }
+
+    static void StopBattleMusic(BattleMusic& battleMusic)
+    {
+        if (battleMusic.isLoaded)
+        {
+            battleMusic.music.stop();
+        }
+    }
+
+    static void ToggleMute(BattleMusic& battleMusic)
+    {
+        battleMusic.isMuted = !battleMusic.isMuted;
+
+        if (battleMusic.isLoaded)
+        {
+            battleMusic.music.setVolume(battleMusic.isMuted ? MUTED_VOLUME : MUSIC_VOLUME);
         }
     }
 

@@ -529,6 +529,11 @@ namespace ReyesCuadra
             {
                 HandleEscape();
             }
+            else
+            {
+                // Las flechas cambian de pagina en la ayuda (si no esta abierta, no hace nada)
+                helpPanel.HandleKey(key->code);
+            }
         }
     }
 
@@ -1558,11 +1563,17 @@ namespace ReyesCuadra
 
     void Gameplay::HandleClick(sf::Vector2f clickPosition)
     {
-        // Con la ayuda abierta, cualquier clic la cierra (y arranca la espera para el proximo clic)
+        // Con la ayuda abierta, los clics son para el cartel (pestanas, flechas o cerrar).
+        // Si se cerro, arranca la espera para el proximo clic.
         if (helpPanel.IsOpen())
         {
-            helpPanel.Close();
-            clickCooldownClock.restart();
+            helpPanel.HandleClick(clickPosition);
+
+            if (!helpPanel.IsOpen())
+            {
+                clickCooldownClock.restart();
+            }
+
             return;
         }
 
