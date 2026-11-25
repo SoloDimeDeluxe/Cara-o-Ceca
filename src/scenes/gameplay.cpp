@@ -529,6 +529,10 @@ namespace ReyesCuadra
             {
                 HandleEscape();
             }
+            else if (key->code == sf::Keyboard::Key::Space || key->code == sf::Keyboard::Key::Enter)
+            {
+                HandleFightKey();
+            }
             else
             {
                 // Las flechas cambian de pagina en la ayuda (si no esta abierta, no hace nada)
@@ -1669,6 +1673,25 @@ namespace ReyesCuadra
         else if (helpButton.Contains(clickPosition))
         {
             helpPanel.Open();
+        }
+    }
+
+    void Gameplay::HandleFightKey()
+    {
+        // Con un cartel abierto o arrastrando una skill, el teclado no hace nada
+        if (helpPanel.IsOpen() || isPaused || IsDraggingSkill())
+        {
+            return;
+        }
+
+        // Igual que el boton: eligiendo skills es "¡Combatir!" y mirando la pelea es "Saltear"
+        if (state == GameState::ChoosingSkills)
+        {
+            ResolveTurn();
+        }
+        else if (state == GameState::PlayingTurn)
+        {
+            FinishPlayback();
         }
     }
 
