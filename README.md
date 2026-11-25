@@ -63,3 +63,6 @@ En el juego, el botón **Cómo se juega** tiene todas las reglas, separadas en p
 - Biblioteca: [SFML](https://www.sfml-dev.org/) 3.1 (licencia zlib, ver `lib/sfml/license.md`).
 - Fuente: Crimson Text (SIL Open Font License, ver `res/fonts/OFL.txt`).
 - Fan game sin fines de lucro, inspirado en el sistema de combate de Limbus Company. Yi Sang, Lei Heng, sus skills y la música pertenecen a Project Moon.
+
+<img width="606" height="268" alt="IV5PBY" src="https://github.com/user-attachments/assets/25b0b1c7-59d7-41e0-8fd5-7fde7b764d14" />
+
