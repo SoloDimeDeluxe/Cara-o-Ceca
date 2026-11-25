@@ -217,7 +217,7 @@ namespace ReyesCuadra
                 {
                     "Modo Difícil", HARD_MODE_COLOR,
                     {
-                        "Yi Sang llega como mucho a +20 SP y Lei Heng nunca baja de 0."
+                        "Lei Heng pega con el 100% de su fuerza desde el primer turno y su SP nunca baja de 0."
                     }
                 },
                 {

@@ -27,9 +27,9 @@ namespace ReyesCuadra
     // Cada tantos turnos, si la cordura de Lei Heng esta en negativo, vuelve a 0 (si no, el Sinking la deja clavada en -45)
     static const int ENEMY_SANITY_RESET_INTERVAL = 3;
 
-    // Modo Dificil: limites de cordura de cada uno
+    // Modo Dificil: limites de cordura de cada uno (Yi Sang igual que en Normal, Lei Heng nunca baja de 0)
     static const int HARD_PLAYER_MIN_SANITY = -45;
-    static const int HARD_PLAYER_MAX_SANITY = 20;
+    static const int HARD_PLAYER_MAX_SANITY = 45;
     static const int HARD_ENEMY_MIN_SANITY = 0;
     static const int HARD_ENEMY_MAX_SANITY = 45;
     static const float ENEMY_FIRST_STAGGER_THRESHOLD = 0.7f;
@@ -40,6 +40,9 @@ namespace ReyesCuadra
     static const float ENEMY_STARTING_STRENGTH = 0.3f;
     static const float ENEMY_STRENGTH_PER_TURN = 0.1f;
     static const float ENEMY_MAX_STRENGTH = 1.0f;
+
+    // En Dificil Lei Heng pega con toda su fuerza desde el primer turno
+    static const float HARD_ENEMY_STRENGTH = 1.0f;
 
     // Posicion de cada skill de Yi Sang dentro de playerSkills (y de los botones)
     enum PlayerSkillIndex
@@ -817,7 +820,7 @@ namespace ReyesCuadra
         enemy.Reset();
         stats = GameStats();
 
-        // Limites de cordura: en Dificil, Yi Sang llega como mucho a +20 y Lei Heng nunca baja de 0
+        // Limites de cordura: en Dificil, Lei Heng nunca baja de 0
         if (isHardMode)
         {
             player.SetSanityLimits(HARD_PLAYER_MIN_SANITY, HARD_PLAYER_MAX_SANITY);
@@ -856,8 +859,14 @@ namespace ReyesCuadra
 
     void Gameplay::PrepareTurn()
     {
-        // Fuerza de Lei Heng este turno: 30% en el turno 1 y +10% por turno, hasta 100%
+        // Fuerza de Lei Heng este turno: 30% en el turno 1 y +10% por turno, hasta 100%.
+        // En Dificil arranca directamente al 100%.
         float enemyStrength = ENEMY_STARTING_STRENGTH + ENEMY_STRENGTH_PER_TURN * static_cast<float>(turn - 1);
+
+        if (isHardMode)
+        {
+            enemyStrength = HARD_ENEMY_STRENGTH;
+        }
 
         if (enemyStrength > ENEMY_MAX_STRENGTH)
         {

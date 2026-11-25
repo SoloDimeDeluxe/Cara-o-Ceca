@@ -7,7 +7,7 @@ Yi Sang pelea contra el jefe Lei Heng. Cada turno Lei Heng hace hasta 6 ataques,
 ## Modos de juego
 
 - **Jugar**: la partida normal. Lei Heng arranca al 30% de su fuerza y se hace más fuerte con cada turno.
-- **Jugar en Difícil**: Yi Sang llega como mucho a +20 de cordura y la de Lei Heng nunca baja de 0.
+- **Jugar en Difícil**: Lei Heng pega con el 100% de su fuerza desde el primer turno y su cordura nunca baja de 0.
 
 Al terminar la partida (ganes o pierdas) se muestran las estadísticas: turnos jugados, daño hecho y recibido, clashes ganados y perdidos, golpes esquivados, prescriptos cumplidos y veces que usaste Furioso-Replica.
 
