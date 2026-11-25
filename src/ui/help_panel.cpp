@@ -217,7 +217,7 @@ namespace ReyesCuadra
                 {
                     "Modo Difícil", HARD_MODE_COLOR,
                     {
-                        "Lei Heng pega con el 100% de su fuerza desde el primer turno y su SP nunca baja de 0."
+                        "Lei Heng arranca al 70% de su fuerza (llega al 100% en el turno 4) y su SP no baja de -20."
                     }
                 },
                 {

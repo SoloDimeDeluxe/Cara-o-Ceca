@@ -83,7 +83,7 @@ namespace ReyesCuadra
         void HandleEvent(const sf::Event& event);
 
         // Deja todo como al principio: vida llena, turno 1 y registro vacio (se llama al apretar Jugar en el menu).
-        // En modo Dificil, Lei Heng pega al 100% desde el turno 1 y su SP nunca baja de 0.
+        // En modo Dificil, Lei Heng arranca al 70% de fuerza (en vez de 30%) y su SP no baja de -20.
         void StartNewGame(bool hardMode);
 
         // Devuelve true una sola vez si el jugador eligio volver al menu principal (desde la pausa o el fin de partida)
