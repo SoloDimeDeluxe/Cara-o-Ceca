@@ -27,11 +27,14 @@ namespace ReyesCuadra
     // Cada tantos turnos, si la cordura de Lei Heng esta en negativo, vuelve a 0 (si no, el Sinking la deja clavada en -45)
     static const int ENEMY_SANITY_RESET_INTERVAL = 3;
 
-    // Modo Dificil: limites de cordura de cada uno (Yi Sang igual que en Normal, Lei Heng no baja de -20)
-    static const int HARD_PLAYER_MIN_SANITY = -45;
-    static const int HARD_PLAYER_MAX_SANITY = 45;
-    static const int HARD_ENEMY_MIN_SANITY = -20;
-    static const int HARD_ENEMY_MAX_SANITY = 45;
+    // Ayudas del modo Normal (el Dificil juega sin ellas): Yi Sang se cura mas al ganar un clash,
+    // recibe la mitad de Burn y arranca con la cordura al maximo
+    static const int NORMAL_CLASH_WIN_HEAL = 15;
+    static const int HARD_CLASH_WIN_HEAL = 5;
+    static const float NORMAL_RECEIVED_BURN_MULTIPLIER = 0.5f;
+    static const float HARD_RECEIVED_BURN_MULTIPLIER = 1.0f;
+    static const int NORMAL_STARTING_SANITY = 45;
+
     static const float ENEMY_FIRST_STAGGER_THRESHOLD = 0.7f;
     static const float ENEMY_SECOND_STAGGER_THRESHOLD = 0.2f;
 
@@ -40,9 +43,6 @@ namespace ReyesCuadra
     static const float ENEMY_STARTING_STRENGTH = 0.3f;
     static const float ENEMY_STRENGTH_PER_TURN = 0.1f;
     static const float ENEMY_MAX_STRENGTH = 1.0f;
-
-    // En Dificil Lei Heng arranca al 70% (en vez de 30%) y sigue subiendo 10% por turno
-    static const float HARD_ENEMY_STARTING_STRENGTH = 0.7f;
 
     // Posicion de cada skill de Yi Sang dentro de playerSkills (y de los botones)
     enum PlayerSkillIndex
@@ -280,9 +280,9 @@ namespace ReyesCuadra
     static std::string FormatPercent(float winChance);
 
     // Dibuja el cuadrado de color, el nombre y la barra de vida de una unidad. Si isRightSide es true, se dibuja espejado a la derecha.
-    // shownHp es la vida que se ve en la barra (baja de a poco durante la pelea).
+    // shownHp es la vida que se ve en la barra (baja de a poco durante la pelea) y shownSanity el SP de ese momento.
     // portrait es el icono de la cara (nullptr si no se pudo cargar: queda el cuadrado de color)
-    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp, const sf::Texture* portraitTexture);
+    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp, int shownSanity, const sf::Texture* portraitTexture);
 
     Gameplay::Gameplay(const sf::Font& gameFont)
         : font(gameFont)
@@ -347,6 +347,8 @@ namespace ReyesCuadra
         , enemyPortrait()
         , isPlayerPortraitLoaded(false)
         , isEnemyPortraitLoaded(false)
+        , shownPlayerSanity(0)
+        , shownEnemySanity(0)
     {
         // Iconos de arriba: si no estan los archivos, queda el cuadrado de color
         isPlayerPortraitLoaded = playerPortrait.loadFromFile(PLAYER_PORTRAIT_PATH);
@@ -820,16 +822,13 @@ namespace ReyesCuadra
         enemy.Reset();
         stats = GameStats();
 
-        // Limites de cordura: en Dificil, Lei Heng no baja de -20
-        if (isHardMode)
+        // En Normal Yi Sang tiene ayudas: se cura mas por clash ganado, recibe la mitad de Burn y arranca con +45 de SP
+        player.SetClashWinHeal(isHardMode ? HARD_CLASH_WIN_HEAL : NORMAL_CLASH_WIN_HEAL);
+        player.SetReceivedBurnMultiplier(isHardMode ? HARD_RECEIVED_BURN_MULTIPLIER : NORMAL_RECEIVED_BURN_MULTIPLIER);
+
+        if (!isHardMode)
         {
-            player.SetSanityLimits(HARD_PLAYER_MIN_SANITY, HARD_PLAYER_MAX_SANITY);
-            enemy.SetSanityLimits(HARD_ENEMY_MIN_SANITY, HARD_ENEMY_MAX_SANITY);
-        }
-        else
-        {
-            player.ResetSanityLimits();
-            enemy.ResetSanityLimits();
+            player.ChangeSanity(NORMAL_STARTING_SANITY);
         }
         turn = 1;
         state = GameState::ChoosingSkills;
@@ -859,9 +858,8 @@ namespace ReyesCuadra
 
     void Gameplay::PrepareTurn()
     {
-        // Fuerza de Lei Heng este turno: 30% en el turno 1 (70% en Dificil) y +10% por turno, hasta 100%
-        const float startingStrength = isHardMode ? HARD_ENEMY_STARTING_STRENGTH : ENEMY_STARTING_STRENGTH;
-        float enemyStrength = startingStrength + ENEMY_STRENGTH_PER_TURN * static_cast<float>(turn - 1);
+        // Fuerza de Lei Heng este turno: 30% en el turno 1 y +10% por turno, hasta 100%
+        float enemyStrength = ENEMY_STARTING_STRENGTH + ENEMY_STRENGTH_PER_TURN * static_cast<float>(turn - 1);
 
         if (enemyStrength > ENEMY_MAX_STRENGTH)
         {
@@ -1223,6 +1221,10 @@ namespace ReyesCuadra
         timeline.Clear();
         timeline.AddLogLine("-- Turno " + std::to_string(turn) + " --");
 
+        // Mientras se ve la pelea, arriba se muestra la cordura de cada momento: arranca con la de ahora
+        shownPlayerSanity = player.GetSanity();
+        shownEnemySanity = enemy.GetSanity();
+
         // La arena arranca mostrando como estaban todos al empezar el turno (la logica ya los va a cambiar)
         arena.Reset(player.IsStaggered(), enemy.IsStaggered());
 
@@ -1268,6 +1270,14 @@ namespace ReyesCuadra
             const bool usesFurioso = !usesActiveEvade && playerSkill == &playerSkills[SKILL_FURIOSO];
 
             player.SetDamageMultiplier(usesMarkedSkill ? MARKED_SKILL_DAMAGE_MULTIPLIER : NORMAL_PLAYER_DAMAGE_MULTIPLIER);
+
+            // Chance real de ganar este clash: con la cordura y los estados de ahora (los clashes anteriores ya los cambiaron)
+            const bool hasClash = playerSkill != nullptr && enemySkill != nullptr && !(playerSkill->IsDefensive() && enemySkill->IsDefensive());
+
+            if (hasClash)
+            {
+                timeline.SetColumnWinChance(EstimateClashWinChance(player, *playerSkill, enemy, *enemySkill));
+            }
 
             const bool evadeHeld = ResolveColumn(player, playerSkill, enemy, enemySkill, timeline);
 
@@ -1383,6 +1393,10 @@ namespace ReyesCuadra
         targetPlayerHp = static_cast<float>(event.playerHpAfter);
         targetEnemyHp = static_cast<float>(event.enemyHpAfter);
 
+        // Y su cordura: el SP de arriba cambia en el momento en que se gana o se pierde cada clash
+        shownPlayerSanity = event.playerSanityAfter;
+        shownEnemySanity = event.enemySanityAfter;
+
         switch (event.type)
         {
             case CombatEventType::ColumnStart:
@@ -1390,6 +1404,12 @@ namespace ReyesCuadra
                 activeColumn = event.column;
                 isShowingClash = false;
                 eventTimer += COLUMN_START_DURATION;
+
+                // El porcentaje de esta columna pasa a ser el de este momento del turno (con el SP que hay ahora)
+                if (event.columnWinChance >= 0.0f)
+                {
+                    winChances[static_cast<size_t>(event.column)] = event.columnWinChance;
+                }
 
                 // En la arena, cada figura muestra la skill que usa en esta columna
                 const Skill* columnPlayerSkill = playerActions[static_cast<size_t>(event.column)];
@@ -1837,8 +1857,10 @@ namespace ReyesCuadra
 
     void Gameplay::DrawUnitPanels(sf::RenderWindow& window) const
     {
-        DrawUnitPanel(window, font, player, false, shownPlayerHp, isPlayerPortraitLoaded ? &playerPortrait : nullptr);
-        DrawUnitPanel(window, font, enemy, true, shownEnemyHp, isEnemyPortraitLoaded ? &enemyPortrait : nullptr);
+        // Mientras se ve la pelea, el SP va cambiando paso a paso; si no, es el de ahora
+        const bool isPlayingTurn = state == GameState::PlayingTurn;
+        DrawUnitPanel(window, font, player, false, shownPlayerHp, isPlayingTurn ? shownPlayerSanity : player.GetSanity(), isPlayerPortraitLoaded ? &playerPortrait : nullptr);
+        DrawUnitPanel(window, font, enemy, true, shownEnemyHp, isPlayingTurn ? shownEnemySanity : enemy.GetSanity(), isEnemyPortraitLoaded ? &enemyPortrait : nullptr);
 
         // Numero de turno en el medio de la pantalla
         const sf::FloatRect turnArea({ 0.0f, TURN_LABEL_Y }, { SCREEN_WIDTH, static_cast<float>(TURN_SIZE) });
@@ -2388,7 +2410,7 @@ namespace ReyesCuadra
         return std::to_string(percent) + "%";
     }
 
-    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp, const sf::Texture* portraitTexture)
+    static void DrawUnitPanel(sf::RenderWindow& window, const sf::Font& font, const Unit& unit, bool isRightSide, float shownHp, int shownSanity, const sf::Texture* portraitTexture)
     {
         // Cuadrado del color del personaje con su cara encima (si se pudo cargar el icono)
         const float portraitX = isRightSide ? SCREEN_WIDTH - MARGIN - PORTRAIT_SIZE : MARGIN;
@@ -2455,9 +2477,9 @@ namespace ReyesCuadra
         // Abajo de la barra se muestra la cordura y los estados que tenga (Poise y Sinking), en una sola linea
         const Poise& poise = unit.GetPoise();
         const Sinking& sinking = unit.GetSinking();
-        const std::string sanitySign = (unit.GetSanity() > 0) ? "+" : "";
+        const std::string sanitySign = (shownSanity > 0) ? "+" : "";
         // Si esta staggereado se avisa adelante, pero igual se muestra su SP completo
-        std::string statusText = std::string(unit.IsStaggered() ? "STAGGER   " : "") + "SP " + sanitySign + std::to_string(unit.GetSanity()) + " (" + FormatPercent(unit.GetHeadsChance()) + " cara)";
+        std::string statusText = std::string(unit.IsStaggered() ? "STAGGER   " : "") + "SP " + sanitySign + std::to_string(shownSanity) + " (" + FormatPercent(Unit::GetHeadsChanceForSanity(shownSanity)) + " cara)";
 
         if (poise.IsActive())
         {

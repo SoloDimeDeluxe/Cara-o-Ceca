@@ -6,8 +6,10 @@ Yi Sang pelea contra el jefe Lei Heng. Cada turno Lei Heng hace hasta 6 ataques,
 
 ## Modos de juego
 
-- **Jugar**: la partida normal. Lei Heng arranca al 30% de su fuerza y se hace más fuerte con cada turno.
-- **Jugar en Difícil**: Lei Heng arranca al 70% de su fuerza (llega al 100% en el turno 4) y su cordura no baja de -20.
+- **Jugar**: el modo Normal, con ayudas para aprender: Yi Sang arranca con +45 de cordura, se cura 15 HP por cada clash ganado y recibe la mitad de Burn.
+- **Jugar en Difícil**: para cuando ya sabés las mecánicas. Sin esas ayudas: Yi Sang arranca con 0 de cordura, se cura solo 5 HP por clash ganado y recibe el Burn completo.
+
+En los dos modos Lei Heng arranca al 30% de su fuerza y se hace más fuerte con cada turno.
 
 Al terminar la partida (ganes o pierdas) se muestran las estadísticas: turnos jugados, daño hecho y recibido, clashes ganados y perdidos, golpes esquivados, prescriptos cumplidos y veces que usaste Furioso-Replica.
 
@@ -19,7 +21,7 @@ Al terminar la partida (ganes o pierdas) se muestran las estadísticas: turnos j
 - Si Lei Heng tiene un solo ataque ese turno, tenés una sola acción.
 - Entre las dos filas se ve tu **chance de ganar** cada clash: buscá los verdes.
 - Si una columna queda sin acción, ese ataque te pega directo.
-- Ganar un clash da **+10 de cordura** y Yi Sang se cura **5 HP**. Perderlo saca 3 o 4 de cordura.
+- Ganar un clash da **+10 de cordura** y Yi Sang se cura (**15 HP** en Normal, **5 HP** en Difícil). Perderlo saca 3 o 4 de cordura.
 - **Esquivar** no es un clash: tirás una vez y los golpes que no superen tu número no te hacen daño. Si esquivás todo, la esquiva sigue activa y cubre los próximos ataques directos hasta que un golpe la supere o termine el turno.
 - Las monedas **irrompibles** de Lei Heng pegan aunque él pierda el clash, pero con la mitad de daño.
 - **Prescripto**: cada turno se marcan hasta 2 skills de tu mano. Usarlas pega +15% y suma una carga; con 9 cargas aparece **Furioso-Replica**, un ataque de 9 monedas irrompibles.

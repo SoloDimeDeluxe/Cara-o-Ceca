@@ -71,6 +71,9 @@ namespace ReyesCuadra
         // Chance de sacar cara en cada moneda segun la cordura: 50% + SP% (con 45 de SP es 95%, con -45 es 5%)
         float GetHeadsChance() const;
 
+        // Chance de sacar cara con una cordura cualquiera (para mostrar el SP de un momento del turno)
+        static float GetHeadsChanceForSanity(int sanityValue);
+
         // Estado de Poise de la unidad (chance de critico)
         Poise& GetPoise();
         const Poise& GetPoise() const;
@@ -97,6 +100,14 @@ namespace ReyesCuadra
         float GetDamageMultiplier() const;
         void SetDamageMultiplier(float multiplier);
 
+        // Vida que recupera la unidad cada vez que gana un clash (0 = no se cura). Depende de la dificultad.
+        int GetClashWinHeal() const;
+        void SetClashWinHeal(int heal);
+
+        // Multiplicador de la potencia de Burn que le ponen a esta unidad (1 = normal, 0.5 = la mitad). Depende de la dificultad.
+        float GetReceivedBurnMultiplier() const;
+        void SetReceivedBurnMultiplier(float multiplier);
+
         // Deja la unidad como al principio: vida llena y sin estados (para empezar una partida nueva)
         void Reset();
 
@@ -113,6 +124,8 @@ namespace ReyesCuadra
         int staggerTurnEndsLeft;
         bool hasPendingStaggerEvent;
         float damageMultiplier;
+        int clashWinHeal;
+        float receivedBurnMultiplier;
         Poise poise;
         Sinking sinking;
         Tremor tremor;

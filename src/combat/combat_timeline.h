@@ -54,6 +54,14 @@ namespace ReyesCuadra
         // Vida de cada uno justo despues de este paso (la barra de vida se va actualizando con esto)
         int playerHpAfter = 0;
         int enemyHpAfter = 0;
+
+        // Cordura (SP) de cada uno justo despues de este paso (el SP de arriba se va actualizando con esto)
+        int playerSanityAfter = 0;
+        int enemySanityAfter = 0;
+
+        // Solo en el comienzo de una columna: chance de Yi Sang de ganar ese clash con la cordura y los estados
+        // que tienen los dos en ese momento del turno (-1 = no hay clash)
+        float columnWinChance = -1.0f;
     };
 
     // Lista ordenada de todo lo que paso en un turno
@@ -66,6 +74,9 @@ namespace ReyesCuadra
         // La columna que se esta resolviendo ahora (los golpes y carteles que se anoten van en esa columna)
         void StartColumn(int column);
         void EndColumn();
+
+        // Anota en el comienzo de la columna actual la chance de ganar su clash (calculada en ese momento del turno)
+        void SetColumnWinChance(float winChance);
 
         void AddHit(const Unit& target, int damage, bool isCritical);
 

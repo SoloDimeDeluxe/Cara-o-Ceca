@@ -83,7 +83,7 @@ namespace ReyesCuadra
         void HandleEvent(const sf::Event& event);
 
         // Deja todo como al principio: vida llena, turno 1 y registro vacio (se llama al apretar Jugar en el menu).
-        // En modo Dificil, Lei Heng arranca al 70% de fuerza (en vez de 30%) y su SP no baja de -20.
+        // En modo Normal Yi Sang arranca con +45 de SP, se cura 15 HP por clash ganado y recibe la mitad de Burn; el Dificil no tiene esas ayudas.
         void StartNewGame(bool hardMode);
 
         // Devuelve true una sola vez si el jugador eligio volver al menu principal (desde la pausa o el fin de partida)
@@ -381,6 +381,11 @@ namespace ReyesCuadra
         sf::Texture enemyPortrait;
         bool isPlayerPortraitLoaded;
         bool isEnemyPortraitLoaded;
+
+        // Cordura que se muestra arriba mientras se ve la pelea: va cambiando paso a paso, con cada clash
+        // (la logica ya resolvio todo el turno, asi que la de las unidades es la del final)
+        int shownPlayerSanity;
+        int shownEnemySanity;
     };
 }
 

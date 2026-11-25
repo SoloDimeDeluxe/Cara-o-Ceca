@@ -22,6 +22,10 @@ namespace ReyesCuadra
     // Dano normal de los golpes (sin hacerse mas debil ni mas fuerte)
     static const float NORMAL_DAMAGE_MULTIPLIER = 1.0f;
 
+    // Por defecto una unidad no se cura al ganar un clash y recibe el Burn completo
+    static const int NO_CLASH_WIN_HEAL = 0;
+    static const float NORMAL_RECEIVED_BURN_MULTIPLIER = 1.0f;
+
     Unit::Unit(const std::string& unitName, int unitMaxHp, sf::Color unitColor)
         : name(unitName)
         , maxHp(unitMaxHp)
@@ -34,12 +38,34 @@ namespace ReyesCuadra
         , staggerTurnEndsLeft(0)
         , hasPendingStaggerEvent(false)
         , damageMultiplier(NORMAL_DAMAGE_MULTIPLIER)
+        , clashWinHeal(NO_CLASH_WIN_HEAL)
+        , receivedBurnMultiplier(NORMAL_RECEIVED_BURN_MULTIPLIER)
     {
     }
 
     float Unit::GetDamageMultiplier() const
     {
         return damageMultiplier;
+    }
+
+    int Unit::GetClashWinHeal() const
+    {
+        return clashWinHeal;
+    }
+
+    void Unit::SetClashWinHeal(int heal)
+    {
+        clashWinHeal = heal;
+    }
+
+    float Unit::GetReceivedBurnMultiplier() const
+    {
+        return receivedBurnMultiplier;
+    }
+
+    void Unit::SetReceivedBurnMultiplier(float multiplier)
+    {
+        receivedBurnMultiplier = multiplier;
     }
 
     void Unit::SetDamageMultiplier(float multiplier)
@@ -234,7 +260,12 @@ namespace ReyesCuadra
 
     float Unit::GetHeadsChance() const
     {
-        return BASE_HEADS_CHANCE + static_cast<float>(sanity) * HEADS_CHANCE_PER_SANITY;
+        return GetHeadsChanceForSanity(sanity);
+    }
+
+    float Unit::GetHeadsChanceForSanity(int sanityValue)
+    {
+        return BASE_HEADS_CHANCE + static_cast<float>(sanityValue) * HEADS_CHANCE_PER_SANITY;
     }
 
     Burn& Unit::GetBurn()

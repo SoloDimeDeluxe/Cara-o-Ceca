@@ -20,9 +20,6 @@ namespace ReyesCuadra
     static const int LOST_CLASH_UNBREAKABLE_COIN_POWER = 1;
     static const float LOST_CLASH_UNBREAKABLE_DAMAGE_MULTIPLIER = 0.5f;
 
-    // Vida que recupera Yi Sang cada vez que gana un clash
-    static const int PLAYER_CLASH_WIN_HEAL = 5;
-
     // Potencia minima que pone un golpe con un estado, por debil que este el que pega
     static const int MIN_INFLICTED_POTENCY = 1;
 
@@ -332,7 +329,8 @@ namespace ReyesCuadra
         const CoinStatusEffect& effect = perCoin[coinIndex];
 
         // Burn (la potencia depende de la fuerza del que pega; la cantidad no)
-        const int burnPotency = ScaleInflictedPotency(effect.burnPotency, statusStrength);
+        // El Burn ademas se escala segun cuanto le afecta al objetivo (en Normal, Yi Sang recibe la mitad)
+        const int burnPotency = ScaleInflictedPotency(effect.burnPotency, statusStrength * target.GetReceivedBurnMultiplier());
 
         if (burnPotency > 0)
         {
@@ -769,12 +767,12 @@ namespace ReyesCuadra
         winner.ChangeSanity(sanityGain);
         loser.ChangeSanity(-sanityLoss);
 
-        // Yi Sang ademas se cura un poco cada vez que gana un clash
+        // Yi Sang ademas se cura un poco cada vez que gana un clash (cuanto depende de la dificultad)
         int healedHp = 0;
 
         if (outcome.playerWon)
         {
-            healedHp = player.Heal(PLAYER_CLASH_WIN_HEAL);
+            healedHp = player.Heal(player.GetClashWinHeal());
 
             if (healedHp > 0)
             {

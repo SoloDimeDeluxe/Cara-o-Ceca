@@ -26,6 +26,21 @@ namespace ReyesCuadra
         currentColumn = NO_COLUMN;
     }
 
+    void CombatTimeline::SetColumnWinChance(float winChance)
+    {
+        // Se busca de atras para adelante el comienzo de la columna que se esta anotando
+        for (size_t eventIndex = events.size(); eventIndex > 0; eventIndex--)
+        {
+            CombatEvent& event = events[eventIndex - 1];
+
+            if (event.type == CombatEventType::ColumnStart)
+            {
+                event.columnWinChance = winChance;
+                return;
+            }
+        }
+    }
+
     void CombatTimeline::AddHit(const Unit& target, int damage, bool isCritical)
     {
         CombatEvent event = MakeEvent(CombatEventType::Hit);
@@ -147,6 +162,8 @@ namespace ReyesCuadra
         event.column = currentColumn;
         event.playerHpAfter = player->GetHp();
         event.enemyHpAfter = enemy->GetHp();
+        event.playerSanityAfter = player->GetSanity();
+        event.enemySanityAfter = enemy->GetSanity();
 
         return event;
     }

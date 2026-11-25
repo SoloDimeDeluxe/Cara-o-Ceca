@@ -123,7 +123,7 @@ namespace ReyesCuadra
                     {
                         "Los dos tiran sus monedas y cada cara suma poder.",
                         "El que suma más le rompe una moneda al otro. Se repite hasta que uno se queda sin monedas.",
-                        "El ganador pega con las monedas que le quedan. Si gana Yi Sang, se cura 5 HP.",
+                        "El ganador pega con las monedas que le quedan. Si gana Yi Sang, se cura (15 HP en Normal, 5 en Difícil).",
                         "El porcentaje entre las dos filas es tu chance de ganar ese clash: buscá los verdes."
                     }
                 },
@@ -217,7 +217,7 @@ namespace ReyesCuadra
                 {
                     "Modo Difícil", HARD_MODE_COLOR,
                     {
-                        "Lei Heng arranca al 70% de su fuerza (llega al 100% en el turno 4) y su SP no baja de -20."
+                        "Para cuando ya sabés jugar: sin las ayudas del Normal (ahí Yi Sang arranca con +45 de SP, se cura 15 HP por clash ganado y recibe la mitad de Burn)."
                     }
                 },
                 {
