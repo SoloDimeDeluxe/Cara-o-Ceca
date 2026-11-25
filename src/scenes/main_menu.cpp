@@ -22,8 +22,13 @@ namespace ReyesCuadra
     static const float SUBTITLE_HEIGHT = 32.0f;
 
     // Cuadrados de color de cada personaje, a los costados del subtitulo
-    static const float PORTRAIT_SIZE = 26.0f;
-    static const float PORTRAIT_OFFSET_X = 170.0f;
+    static const float PORTRAIT_SIZE = 52.0f;
+    static const float PORTRAIT_OFFSET_X = 190.0f;
+    static const float PORTRAIT_BORDER_THICKNESS = 2.0f;
+
+    // Caras de los dos personajes a los costados de "Yi Sang vs Lei Heng"
+    static const char* PLAYER_PORTRAIT_PATH = "res/sprites/yi_sang_portrait.png";
+    static const char* ENEMY_PORTRAIT_PATH = "res/sprites/lei_heng_portrait.png";
 
     // Botones, uno abajo del otro
     static const sf::Vector2f BUTTON_SIZE = { 320.0f, 56.0f };
@@ -102,7 +107,18 @@ namespace ReyesCuadra
         , helpPanel(menuFont, { SCREEN_WIDTH, SCREEN_HEIGHT })
         , isShowingCredits(false)
         , mousePosition({ 0.0f, 0.0f })
+        , playerPortrait()
+        , enemyPortrait()
+        , isPlayerPortraitLoaded(false)
+        , isEnemyPortraitLoaded(false)
     {
+        // Si no se encuentra alguna imagen, en su lugar queda el cuadrado del color del personaje
+        isPlayerPortraitLoaded = playerPortrait.loadFromFile(PLAYER_PORTRAIT_PATH);
+        isEnemyPortraitLoaded = enemyPortrait.loadFromFile(ENEMY_PORTRAIT_PATH);
+
+        // Se achican a la mitad: con suavizado no quedan pixeles serruchados
+        playerPortrait.setSmooth(true);
+        enemyPortrait.setSmooth(true);
     }
 
     MenuAction MainMenu::HandleEvent(const sf::Event& event)
@@ -195,15 +211,8 @@ namespace ReyesCuadra
 
         const float portraitY = SUBTITLE_Y + (SUBTITLE_HEIGHT - PORTRAIT_SIZE) / 2.0f;
 
-        sf::RectangleShape playerPortrait({ PORTRAIT_SIZE, PORTRAIT_SIZE });
-        playerPortrait.setPosition({ SCREEN_WIDTH / 2.0f - PORTRAIT_OFFSET_X - PORTRAIT_SIZE, portraitY });
-        playerPortrait.setFillColor(PLAYER_COLOR);
-        window.draw(playerPortrait);
-
-        sf::RectangleShape enemyPortrait({ PORTRAIT_SIZE, PORTRAIT_SIZE });
-        enemyPortrait.setPosition({ SCREEN_WIDTH / 2.0f + PORTRAIT_OFFSET_X, portraitY });
-        enemyPortrait.setFillColor(ENEMY_COLOR);
-        window.draw(enemyPortrait);
+        DrawPortrait(window, isPlayerPortraitLoaded ? &playerPortrait : nullptr, { SCREEN_WIDTH / 2.0f - PORTRAIT_OFFSET_X - PORTRAIT_SIZE, portraitY }, PLAYER_COLOR);
+        DrawPortrait(window, isEnemyPortraitLoaded ? &enemyPortrait : nullptr, { SCREEN_WIDTH / 2.0f + PORTRAIT_OFFSET_X, portraitY }, ENEMY_COLOR);
 
         playButton.Draw(window, mousePosition);
         playHardButton.Draw(window, mousePosition);
@@ -239,6 +248,30 @@ namespace ReyesCuadra
 
         const sf::FloatRect letterArea({ SCREEN_WIDTH / 2.0f - COIN_RADIUS, COIN_CENTER_Y - COIN_RADIUS }, { COIN_RADIUS * 2.0f, COIN_RADIUS * 2.0f });
         DrawTextCentered(window, font, "C", COIN_LETTER_SIZE, letterArea, COIN_LETTER_COLOR);
+    }
+
+    void MainMenu::DrawPortrait(sf::RenderWindow& window, const sf::Texture* portraitTexture, sf::Vector2f position, sf::Color frameColor) const
+    {
+        // Marco del color del personaje (y relleno, por si no hay imagen)
+        sf::RectangleShape frame({ PORTRAIT_SIZE, PORTRAIT_SIZE });
+        frame.setPosition(position);
+        frame.setFillColor(frameColor);
+        frame.setOutlineColor(frameColor);
+        frame.setOutlineThickness(PORTRAIT_BORDER_THICKNESS);
+        window.draw(frame);
+
+        if (portraitTexture == nullptr)
+        {
+            return;
+        }
+
+        // La imagen se agranda o achica para ocupar justo el cuadrado
+        const sf::Vector2f textureSize = sf::Vector2f(portraitTexture->getSize());
+
+        sf::Sprite portraitSprite(*portraitTexture);
+        portraitSprite.setPosition(position);
+        portraitSprite.setScale({ PORTRAIT_SIZE / textureSize.x, PORTRAIT_SIZE / textureSize.y });
+        window.draw(portraitSprite);
     }
 
     void MainMenu::DrawCredits(sf::RenderWindow& window) const

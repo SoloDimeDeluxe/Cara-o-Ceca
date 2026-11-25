@@ -39,6 +39,9 @@ namespace ReyesCuadra
         // Cartel con los creditos (quien lo hizo, en que se basa, fuente y libreria)
         void DrawCredits(sf::RenderWindow& window) const;
 
+        // Cara de un personaje con un marco de su color (sin imagen, queda solo el cuadrado de color)
+        void DrawPortrait(sf::RenderWindow& window, const sf::Texture* portraitTexture, sf::Vector2f position, sf::Color frameColor) const;
+
         const sf::Font& font;
 
         Button playButton;
@@ -50,6 +53,12 @@ namespace ReyesCuadra
 
         bool isShowingCredits;
         sf::Vector2f mousePosition;
+
+        // Caras de Yi Sang y Lei Heng que van a los costados del subtitulo
+        sf::Texture playerPortrait;
+        sf::Texture enemyPortrait;
+        bool isPlayerPortraitLoaded;
+        bool isEnemyPortraitLoaded;
     };
 }
 
