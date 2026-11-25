@@ -79,7 +79,7 @@ namespace ReyesCuadra
         Gameplay(const Gameplay&) = delete;
         Gameplay& operator=(const Gameplay&) = delete;
 
-        // Recibe los eventos de la ventana (movimiento y clics del mouse, y Esc para pausar)
+        // Recibe los eventos de la ventana (movimiento y clics del mouse, Esc para pausar y Espacio / Enter para combatir)
         void HandleEvent(const sf::Event& event);
 
         // Deja todo como al principio: vida llena, turno 1 y registro vacio (se llama al apretar Jugar en el menu).
@@ -98,6 +98,9 @@ namespace ReyesCuadra
     private:
         // Esc: cierra la ayuda si esta abierta; si no, pausa o despausa (con la partida terminada no hace nada)
         void HandleEscape();
+
+        // Espacio o Enter: hace lo mismo que el boton de Combatir (o Saltear mientras se ve la pelea)
+        void HandleFightKey();
 
         // Suma a las estadisticas lo que paso en el turno que se acaba de resolver (dano, clashes, esquivas)
         void CountTurnStats();

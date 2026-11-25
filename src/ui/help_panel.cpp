@@ -223,7 +223,7 @@ namespace ReyesCuadra
                 {
                     "Controles", CONTROLS_COLOR,
                     {
-                        "Esc: pausa (o cierra este cartel).   M: silenciar la música.   ← →: cambiar de página."
+                        "Espacio o Enter: combatir (o saltear la pelea).   Esc: pausa (o cierra este cartel).   M: silenciar la música.   ← →: cambiar de página."
                     }
                 }
             }

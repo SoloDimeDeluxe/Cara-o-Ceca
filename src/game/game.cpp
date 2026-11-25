@@ -24,6 +24,9 @@ namespace ReyesCuadra
     // Ruta de la fuente que usan todos los textos del juego
     static const char* FONT_PATH = "res/fonts/CrimsonText-SemiBold.ttf";
 
+    // Icono de la ventana y de la barra de tareas (la cara de Yi Sang)
+    static const char* WINDOW_ICON_PATH = "res/sprites/yi_sang_portrait.png";
+
     // Musica de la batalla: se repite en loop mientras dura la pelea y se corta al volver al menu
     static const char* BATTLE_MUSIC_PATH = "res/music/battle_theme.ogg";
     static const float MUSIC_VOLUME = 35.0f;
@@ -77,6 +80,17 @@ namespace ReyesCuadra
         // Titlebar | Close: la ventana no se puede agrandar, asi las coordenadas del mouse coinciden con las del juego
         sf::RenderWindow window(sf::VideoMode({ SCREEN_WIDTH, SCREEN_HEIGHT }), ToSfString(WINDOW_TITLE), sf::Style::Titlebar | sf::Style::Close);
         window.setFramerateLimit(TARGET_FPS);
+
+        // Si se deja apretada una tecla, cuenta como una sola vez (asi Espacio no combate y saltea de golpe)
+        window.setKeyRepeatEnabled(false);
+
+        // Si no se encuentra la imagen queda el icono comun de Windows
+        sf::Image windowIcon;
+
+        if (windowIcon.loadFromFile(WINDOW_ICON_PATH))
+        {
+            window.setIcon(windowIcon);
+        }
 
         MainMenu menu(font);
         Gameplay gameplay(font);
